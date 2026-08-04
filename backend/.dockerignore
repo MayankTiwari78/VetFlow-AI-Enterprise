@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+*.log
+backend-package.txt
+package-files.txt
+project-structure.txt
