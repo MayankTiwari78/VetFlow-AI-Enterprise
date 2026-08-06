@@ -10,7 +10,7 @@ const Sidebar = () => {
   const { aToken } = useContext(AdminContext)
 
   return (
-    <aside className='sticky top-20 min-h-[calc(100vh-5rem)] border-r border-line bg-white'>
+    <aside className='sticky top-20 max-h-[calc(100vh-5rem)] min-h-[calc(100vh-5rem)] overflow-y-auto border-r border-line bg-white'>
       {aToken && <ul className='mt-4 space-y-1 px-2 text-slate-600'>
 
         <NavLink to={'/admin-dashboard'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
@@ -36,6 +36,38 @@ const Sidebar = () => {
         <NavLink to={'/medical-records'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.list_icon} alt='' />
           <p className='hidden md:block'>Medical Records</p>
+        </NavLink>
+        <NavLink to={'/veterinary-admin-dashboard'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.home_icon} alt='' />
+          <p className='hidden md:block'>Veterinary Dashboard</p>
+        </NavLink>
+        <NavLink to={'/veterinary-pet-owners'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.people_icon} alt='' />
+          <p className='hidden md:block'>Pet Owners</p>
+        </NavLink>
+        <NavLink to={'/veterinary-pets'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.patients_icon} alt='' />
+          <p className='hidden md:block'>Pets</p>
+        </NavLink>
+        <NavLink to={'/veterinary-veterinarians'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.doctor_icon} alt='' />
+          <p className='hidden md:block'>Veterinarians</p>
+        </NavLink>
+        <NavLink to={'/veterinary-vaccinations'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.appointment_icon} alt='' />
+          <p className='hidden md:block'>Veterinary Vaccinations</p>
+        </NavLink>
+        <NavLink to={'/veterinary-medical-records'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.list_icon} alt='' />
+          <p className='hidden md:block'>Pet Medical Records</p>
+        </NavLink>
+        <NavLink to={'/veterinary-ai-reports'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.list_icon} alt='' />
+          <p className='hidden md:block'>Veterinary AI Reports</p>
+        </NavLink>
+        <NavLink to={'/veterinary-analytics'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.list_icon} alt='' />
+          <p className='hidden md:block'>Veterinary Analytics</p>
         </NavLink>
         <NavLink to={'/memberships'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.people_icon} alt='' />
@@ -63,6 +95,26 @@ const Sidebar = () => {
         <NavLink to={'/doctor-profile'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.people_icon} alt='' />
           <p className='hidden md:block'>Profile</p>
+        </NavLink>
+        <NavLink to={'/veterinarian-dashboard'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.home_icon} alt='' />
+          <p className='hidden md:block'>Veterinarian Dashboard</p>
+        </NavLink>
+        <NavLink to={'/veterinarian-pets'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.patients_icon} alt='' />
+          <p className='hidden md:block'>Assigned Pets</p>
+        </NavLink>
+        <NavLink to={'/veterinarian-medical-records'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.list_icon} alt='' />
+          <p className='hidden md:block'>Pet Medical Records</p>
+        </NavLink>
+        <NavLink to={'/veterinarian-vaccinations'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.appointment_icon} alt='' />
+          <p className='hidden md:block'>Vaccinations</p>
+        </NavLink>
+        <NavLink to={'/veterinarian-ai-reports'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.list_icon} alt='' />
+          <p className='hidden md:block'>AI Reports</p>
         </NavLink>
         <NavLink to={'/security'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.people_icon} alt='' />

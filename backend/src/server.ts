@@ -21,22 +21,12 @@ const shutdown = async (signal: string): Promise<void> => {
   process.exit(0);
 };
 
-const start = (): void => {
+const start = async (): Promise<void> => {
   configureCloudinary();
+  await connectDB();
 
   server = app.listen(env.PORT, () => {
     logger.info({ event: "server.started", port: env.PORT }, "Server started");
-  });
-
-  connectDB().catch((error: unknown) => {
-    logger.error({ event: "mongodb.startup_failed" }, "Database startup connection failed");
-    if (env.isProduction) {
-      logger.fatal(
-        { err: error instanceof Error ? error : undefined },
-        error instanceof Error ? error.message : "Unknown database error"
-      );
-      process.exit(1);
-    }
   });
 };
 
@@ -58,4 +48,10 @@ process.on("uncaughtException", (error) => {
   void shutdown("uncaughtException");
 });
 
-start();
+start().catch((error: unknown) => {
+  logger.fatal(
+    { event: "mongodb.startup_failed", err: error instanceof Error ? error : undefined },
+    error instanceof Error ? error.message : "Database startup connection failed"
+  );
+  process.exit(1);
+});

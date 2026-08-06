@@ -1,3 +1,260 @@
+type OpenApiSchema = Record<string, unknown>;
+
+const veterinaryIds = {
+  userId: "66aa7f0f0f0f0f0f0f0f0f01",
+  ownerId: "66aa7f0f0f0f0f0f0f0f0f02",
+  petId: "66aa7f0f0f0f0f0f0f0f0f04",
+  doctorId: "66aa7f0f0f0f0f0f0f0f0f03",
+  veterinarianId: "66aa7f0f0f0f0f0f0f0f0f05",
+  vaccinationId: "66aa7f0f0f0f0f0f0f0f0f06",
+  recordId: "66aa7f0f0f0f0f0f0f0f0f07",
+  reportId: "66aa7f0f0f0f0f0f0f0f0f08"
+} as const;
+
+const veterinaryPaginationExample = { page: 1, limit: 20, total: 42, pages: 3 };
+
+const petOwnerRequestExample = {
+  userId: veterinaryIds.userId,
+  phone: "+91 9876543210",
+  address: { line1: "12 Clinic Road", line2: "Bengaluru" },
+  emergencyContact: "Priya Sharma",
+  emergencyPhone: "+91 9876543211"
+};
+
+const petOwnerExample = {
+  _id: veterinaryIds.ownerId,
+  ...petOwnerRequestExample,
+  createdAt: "2026-08-04T09:00:00.000Z",
+  updatedAt: "2026-08-04T09:00:00.000Z"
+};
+
+const petRequestExample = {
+  ownerId: veterinaryIds.ownerId,
+  name: "Bruno",
+  species: "Dog",
+  breed: "Labrador Retriever",
+  gender: "Male",
+  age: 4,
+  weight: 28.5,
+  color: "Golden",
+  dateOfBirth: "2021-04-12",
+  microchipNumber: "IND-MICRO-001",
+  vaccinationStatus: "up_to_date",
+  allergies: ["chicken"],
+  medicalHistory: ["Ear infection"],
+  profileImage: "https://res.cloudinary.com/demo/pet.jpg"
+};
+
+const petExample = {
+  _id: veterinaryIds.petId,
+  ...petRequestExample,
+  createdAt: "2026-08-04T09:05:00.000Z",
+  updatedAt: "2026-08-04T09:05:00.000Z"
+};
+
+const veterinarianRequestExample = {
+  doctorId: veterinaryIds.doctorId,
+  specialization: ["Small animal medicine", "Dermatology"],
+  clinicName: "VetFlow Care Clinic",
+  yearsOfExperience: 8,
+  licenseNumber: "VET-KA-12345",
+  consultationFee: 750,
+  availability: {
+    enabled: true,
+    timezone: "Asia/Kolkata",
+    consultationDurationMinutes: 30,
+    weeklySchedule: [{ dayOfWeek: 1, slots: ["10:00", "10:30"] }]
+  }
+};
+
+const veterinarianExample = {
+  _id: veterinaryIds.veterinarianId,
+  ...veterinarianRequestExample,
+  createdAt: "2026-08-04T09:10:00.000Z",
+  updatedAt: "2026-08-04T09:10:00.000Z"
+};
+
+const vaccinationRequestExample = {
+  petId: veterinaryIds.petId,
+  vaccineName: "Rabies",
+  dueDate: "2026-09-01",
+  completedDate: "2026-09-01",
+  nextDose: "2027-09-01",
+  veterinarian: veterinaryIds.veterinarianId,
+  notes: "Annual booster administered."
+};
+
+const vaccinationExample = {
+  _id: veterinaryIds.vaccinationId,
+  ...vaccinationRequestExample,
+  createdAt: "2026-08-04T09:15:00.000Z",
+  updatedAt: "2026-08-04T09:15:00.000Z"
+};
+
+const petMedicalRecordRequestExample = {
+  petId: veterinaryIds.petId,
+  veterinarianId: veterinaryIds.veterinarianId,
+  diagnosis: "Otitis externa",
+  symptoms: ["Head shaking", "Ear odor"],
+  medications: [
+    {
+      name: "Otic drops",
+      dosage: "4 drops",
+      frequency: "Twice daily",
+      duration: "7 days",
+      instructions: "Apply after cleaning the ear."
+    }
+  ],
+  prescriptions: [
+    {
+      medicationName: "Otic drops",
+      dosage: "4 drops",
+      frequency: "Twice daily",
+      duration: "7 days",
+      instructions: "Return if irritation persists."
+    }
+  ],
+  treatment: "Ear cleaning and topical medication.",
+  laboratoryReports: [
+    {
+      title: "Ear swab cytology",
+      reportType: "Cytology",
+      result: "Mild yeast overgrowth",
+      uploadedAt: "2026-08-04T09:20:00.000Z"
+    }
+  ],
+  attachments: [
+    {
+      fileName: "ear-photo.jpg",
+      fileUrl: "https://res.cloudinary.com/demo/ear-photo.jpg",
+      fileType: "image/jpeg",
+      uploadedAt: "2026-08-04T09:20:00.000Z"
+    }
+  ],
+  visitDate: "2026-08-04T09:20:00.000Z",
+  followUpDate: "2026-08-18T09:20:00.000Z"
+};
+
+const petMedicalRecordExample = {
+  _id: veterinaryIds.recordId,
+  ...petMedicalRecordRequestExample,
+  createdAt: "2026-08-04T09:20:00.000Z",
+  updatedAt: "2026-08-04T09:20:00.000Z"
+};
+
+const aiReportRequestExample = {
+  petId: veterinaryIds.petId,
+  symptoms: ["Vomiting", "Low appetite"],
+  uploadedImages: ["https://res.cloudinary.com/demo/pet-symptom.jpg"],
+  aiSummary: "Preliminary assessment suggests monitoring hydration and clinical evaluation.",
+  possibleConditions: ["Gastritis"],
+  severity: "moderate",
+  recommendations: ["Book a veterinary visit"],
+  generatedAt: "2026-08-04T09:25:00.000Z"
+};
+
+const aiReportExample = {
+  _id: veterinaryIds.reportId,
+  ...aiReportRequestExample,
+  createdAt: "2026-08-04T09:25:00.000Z",
+  updatedAt: "2026-08-04T09:25:00.000Z"
+};
+
+const veterinaryStatsExample = {
+  totalPets: 12,
+  totalPetOwners: 8,
+  totalVeterinarians: 3,
+  totalVaccinations: 24,
+  totalAiReports: 6,
+  recentMedicalRecords: [petMedicalRecordExample]
+};
+
+const veterinarySummaryExample = {
+  stats: veterinaryStatsExample,
+  recentVaccinations: [vaccinationExample],
+  recentAiReports: [aiReportExample],
+  preliminaryAssessmentNotice:
+    "AI reports are preliminary assessment reports only and are not a diagnosis."
+};
+
+const veterinarySuccessExample = (message: string, data?: OpenApiSchema) => ({
+  success: true,
+  message,
+  ...(data === undefined ? {} : { data })
+});
+
+const veterinarySuccessResponse = (
+  description: string,
+  message: string,
+  data?: OpenApiSchema
+) => ({
+  description,
+  content: {
+    "application/json": {
+      schema: { $ref: "#/components/schemas/SuccessResponse" },
+      example: veterinarySuccessExample(message, data)
+    }
+  }
+});
+
+const veterinaryRequestBody = (schemaName: string, example: OpenApiSchema) => ({
+  required: true,
+  content: {
+    "application/json": {
+      schema: { $ref: `#/components/schemas/${schemaName}` },
+      example
+    }
+  }
+});
+
+const veterinaryPathParameter = (name: string, example: string) => ({
+  name,
+  in: "path",
+  required: true,
+  schema: { type: "string" },
+  example
+});
+
+const veterinaryTargetParameters = [
+  {
+    name: "ownerId",
+    in: "query",
+    schema: { type: "string" },
+    example: veterinaryIds.ownerId
+  },
+  {
+    name: "userId",
+    in: "query",
+    schema: { type: "string" },
+    example: veterinaryIds.userId
+  }
+];
+
+const veterinaryListParameters = (searchExample: string, sortExample: string) => [
+  { name: "page", in: "query", schema: { type: "integer", default: 1 }, example: 1 },
+  {
+    name: "limit",
+    in: "query",
+    schema: { type: "integer", default: 20, maximum: 100 },
+    example: 20
+  },
+  { name: "search", in: "query", schema: { type: "string" }, example: searchExample },
+  { name: "sort", in: "query", schema: { type: "string" }, example: sortExample }
+];
+
+const petFilterParameters = [
+  ...veterinaryListParameters("Bruno", "-createdAt"),
+  { name: "ownerId", in: "query", schema: { type: "string" }, example: veterinaryIds.ownerId },
+  { name: "species", in: "query", schema: { type: "string" }, example: "Dog" },
+  { name: "breed", in: "query", schema: { type: "string" }, example: "Labrador Retriever" },
+  { name: "age", in: "query", schema: { type: "number" }, example: 4 },
+  { name: "minAge", in: "query", schema: { type: "number" }, example: 1 },
+  { name: "maxAge", in: "query", schema: { type: "number" }, example: 10 },
+  { name: "weight", in: "query", schema: { type: "number" }, example: 28.5 },
+  { name: "minWeight", in: "query", schema: { type: "number" }, example: 5 },
+  { name: "maxWeight", in: "query", schema: { type: "number" }, example: 40 }
+];
+
 export const openApiDocument = {
   openapi: "3.0.3",
   info: {
@@ -18,7 +275,8 @@ export const openApiDocument = {
     { name: "Users" },
     { name: "Doctors" },
     { name: "Admin" },
-    { name: "Payments" }
+    { name: "Payments" },
+    { name: "Veterinary" }
   ],
   components: {
     securitySchemes: {
@@ -138,7 +396,193 @@ export const openApiDocument = {
           }
         }
       },
-      AppointmentStatus: { type: "string", enum: ["scheduled", "completed", "cancelled"] }
+      AppointmentStatus: { type: "string", enum: ["scheduled", "completed", "cancelled"] },
+      Pagination: {
+        type: "object",
+        properties: {
+          page: { type: "integer", example: 1 },
+          limit: { type: "integer", example: 20 },
+          total: { type: "integer", example: 42 },
+          pages: { type: "integer", example: 3 }
+        }
+      },
+      PetOwnerRequest: {
+        type: "object",
+        properties: {
+          userId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f01" },
+          phone: { type: "string", example: "+91 9876543210" },
+          address: {
+            type: "object",
+            properties: {
+              line1: { type: "string", example: "12 Clinic Road" },
+              line2: { type: "string", example: "Bengaluru" }
+            }
+          },
+          emergencyContact: { type: "string", example: "Priya Sharma" },
+          emergencyPhone: { type: "string", example: "+91 9876543211" }
+        }
+      },
+      PetOwnerUpdateRequest: {
+        type: "object",
+        description: "Partial pet owner update. Provide at least one field.",
+        properties: {
+          phone: { type: "string", example: "+91 9876543212" },
+          address: {
+            type: "object",
+            properties: {
+              line1: { type: "string", example: "24 Wellness Avenue" },
+              line2: { type: "string", example: "Bengaluru" }
+            }
+          },
+          emergencyContact: { type: "string", example: "Aarav Sharma" },
+          emergencyPhone: { type: "string", example: "+91 9876543213" }
+        }
+      },
+      PetRequest: {
+        type: "object",
+        required: ["name", "species"],
+        properties: {
+          ownerId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f02" },
+          name: { type: "string", example: "Bruno" },
+          species: { type: "string", example: "Dog" },
+          breed: { type: "string", example: "Labrador Retriever" },
+          gender: { type: "string", example: "Male" },
+          age: { type: "number", example: 4 },
+          weight: { type: "number", example: 28.5 },
+          color: { type: "string", example: "Golden" },
+          dateOfBirth: { type: "string", format: "date", example: "2021-04-12" },
+          microchipNumber: { type: "string", example: "IND-MICRO-001" },
+          vaccinationStatus: { type: "string", example: "up_to_date" },
+          allergies: { type: "array", items: { type: "string" }, example: ["chicken"] },
+          medicalHistory: { type: "array", items: { type: "string" }, example: ["Ear infection"] },
+          profileImage: { type: "string", example: "https://res.cloudinary.com/demo/pet.jpg" }
+        }
+      },
+      PetUpdateRequest: {
+        type: "object",
+        description: "Partial pet update. Provide at least one field.",
+        properties: {
+          ownerId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f02" },
+          name: { type: "string", example: "Bruno" },
+          species: { type: "string", example: "Dog" },
+          breed: { type: "string", example: "Labrador Retriever" },
+          gender: { type: "string", example: "Male" },
+          age: { type: "number", example: 4 },
+          weight: { type: "number", example: 29 },
+          color: { type: "string", example: "Golden" },
+          dateOfBirth: { type: "string", format: "date", example: "2021-04-12" },
+          microchipNumber: { type: "string", example: "IND-MICRO-001" },
+          vaccinationStatus: { type: "string", example: "booster_due" },
+          allergies: { type: "array", items: { type: "string" }, example: ["chicken"] },
+          medicalHistory: { type: "array", items: { type: "string" }, example: ["Ear infection"] },
+          profileImage: { type: "string", example: "https://res.cloudinary.com/demo/pet.jpg" }
+        }
+      },
+      VeterinarianRequest: {
+        type: "object",
+        required: ["doctorId", "clinicName", "yearsOfExperience", "licenseNumber", "consultationFee"],
+        properties: {
+          doctorId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f03" },
+          specialization: {
+            type: "array",
+            items: { type: "string" },
+            example: ["Small animal medicine", "Dermatology"]
+          },
+          clinicName: { type: "string", example: "VetFlow Care Clinic" },
+          yearsOfExperience: { type: "integer", example: 8 },
+          licenseNumber: { type: "string", example: "VET-KA-12345" },
+          consultationFee: { type: "number", example: 750 },
+          availability: { $ref: "#/components/schemas/DoctorAvailability" }
+        }
+      },
+      VeterinarianUpdateRequest: {
+        type: "object",
+        description: "Partial veterinarian profile update. Provide at least one field.",
+        properties: {
+          specialization: {
+            type: "array",
+            items: { type: "string" },
+            example: ["Small animal medicine", "Emergency care"]
+          },
+          clinicName: { type: "string", example: "VetFlow Advanced Care" },
+          yearsOfExperience: { type: "integer", example: 9 },
+          licenseNumber: { type: "string", example: "VET-KA-12345" },
+          consultationFee: { type: "number", example: 850 },
+          availability: { $ref: "#/components/schemas/DoctorAvailability" }
+        }
+      },
+      VaccinationRequest: {
+        type: "object",
+        required: ["petId", "vaccineName", "dueDate"],
+        properties: {
+          petId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f04" },
+          vaccineName: { type: "string", example: "Rabies" },
+          dueDate: { type: "string", format: "date", example: "2026-09-01" },
+          completedDate: { type: "string", format: "date", example: "2026-09-01" },
+          nextDose: { type: "string", format: "date", example: "2027-09-01" },
+          veterinarian: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f05" },
+          notes: { type: "string", example: "Annual booster administered." }
+        }
+      },
+      VaccinationUpdateRequest: {
+        type: "object",
+        description: "Partial vaccination update. Provide at least one field.",
+        properties: {
+          vaccineName: { type: "string", example: "Rabies" },
+          dueDate: { type: "string", format: "date", example: "2026-09-01" },
+          completedDate: { type: "string", format: "date", example: "2026-09-01" },
+          nextDose: { type: "string", format: "date", example: "2027-09-01" },
+          veterinarian: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f05" },
+          notes: { type: "string", example: "Annual booster administered." }
+        }
+      },
+      PetMedicalRecordRequest: {
+        type: "object",
+        required: ["petId", "diagnosis", "treatment"],
+        properties: {
+          petId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f04" },
+          veterinarianId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f05" },
+          diagnosis: { type: "string", example: "Otitis externa" },
+          symptoms: { type: "array", items: { type: "string" }, example: ["Head shaking", "Ear odor"] },
+          medications: { type: "array", items: { type: "object", additionalProperties: true } },
+          prescriptions: { type: "array", items: { type: "object", additionalProperties: true } },
+          treatment: { type: "string", example: "Ear cleaning and topical medication." },
+          laboratoryReports: { type: "array", items: { type: "object", additionalProperties: true } },
+          attachments: { type: "array", items: { type: "object", additionalProperties: true } },
+          visitDate: { type: "string", format: "date-time" },
+          followUpDate: { type: "string", format: "date-time" }
+        }
+      },
+      PetMedicalRecordUpdateRequest: {
+        type: "object",
+        description: "Partial pet medical record update. Provide at least one field.",
+        properties: {
+          diagnosis: { type: "string", example: "Otitis externa improving" },
+          symptoms: { type: "array", items: { type: "string" }, example: ["Head shaking"] },
+          medications: { type: "array", items: { type: "object", additionalProperties: true } },
+          prescriptions: { type: "array", items: { type: "object", additionalProperties: true } },
+          treatment: { type: "string", example: "Continue topical medication for three more days." },
+          laboratoryReports: { type: "array", items: { type: "object", additionalProperties: true } },
+          attachments: { type: "array", items: { type: "object", additionalProperties: true } },
+          visitDate: { type: "string", format: "date-time" },
+          followUpDate: { type: "string", format: "date-time" }
+        }
+      },
+      AiReportRequest: {
+        type: "object",
+        required: ["petId", "aiSummary", "severity"],
+        description: "Preliminary assessment report only. This is not a diagnosis.",
+        properties: {
+          petId: { type: "string", example: "66aa7f0f0f0f0f0f0f0f0f04" },
+          symptoms: { type: "array", items: { type: "string" }, example: ["Vomiting", "Low appetite"] },
+          uploadedImages: { type: "array", items: { type: "string" } },
+          aiSummary: { type: "string", example: "Preliminary assessment suggests monitoring hydration and clinical evaluation." },
+          possibleConditions: { type: "array", items: { type: "string" }, example: ["Gastritis"] },
+          severity: { type: "string", enum: ["low", "moderate", "high", "urgent"], example: "moderate" },
+          recommendations: { type: "array", items: { type: "string" }, example: ["Book a veterinary visit"] },
+          generatedAt: { type: "string", format: "date-time" }
+        }
+      }
     },
     responses: {
       Unauthorized: {
@@ -526,6 +970,575 @@ export const openApiDocument = {
         responses: {
           "200": { description: "Tenant-scoped audit logs" },
           "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/veterinary/dashboard/stats": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Veterinary dashboard statistics",
+        description:
+          "Returns scoped totals for pets, pet owners, veterinarians, vaccinations, AI reports, and recent pet medical records.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": veterinarySuccessResponse("Scoped veterinary statistics", "Veterinary dashboard statistics loaded", {
+            stats: veterinaryStatsExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/veterinary/dashboard/summary": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Veterinary dashboard summary",
+        description:
+          "Returns scoped dashboard totals, recent vaccinations, recent preliminary AI reports, and the preliminary assessment notice.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Scoped dashboard summary with recent veterinary activity",
+            "Veterinary dashboard summary loaded",
+            { summary: veterinarySummaryExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/veterinary/search/pets": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Search pets",
+        description:
+          "Searches scoped pets with pagination plus owner, species, breed, age, and weight filters.",
+        security: [{ bearerAuth: [] }],
+        parameters: petFilterParameters,
+        responses: {
+          "200": veterinarySuccessResponse("Paginated scoped pet search results", "Pet search results loaded", {
+            pets: [petExample],
+            pagination: veterinaryPaginationExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/veterinary/search/pet-owners": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Search pet owners",
+        description: "Searches scoped pet owner profiles by owner fields or linked user.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...veterinaryListParameters("Sharma", "-createdAt"),
+          { name: "userId", in: "query", schema: { type: "string" }, example: veterinaryIds.userId }
+        ],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Paginated scoped pet owner search results",
+            "Pet owner search results loaded",
+            { petOwners: [petOwnerExample], pagination: veterinaryPaginationExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/veterinary/search/veterinarians": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Search veterinarians",
+        description: "Searches veterinarian profiles by clinic, specialization, and license fields.",
+        security: [{ bearerAuth: [] }],
+        parameters: veterinaryListParameters("Dermatology", "clinicName"),
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Paginated veterinarian search results",
+            "Veterinarian search results loaded",
+            { veterinarians: [veterinarianExample], pagination: veterinaryPaginationExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pet-owners": {
+      post: {
+        tags: ["Veterinary"],
+        summary: "Create pet owner profile",
+        description: "Creates a veterinary owner profile for the authenticated or supplied user.",
+        security: [{ bearerAuth: [] }],
+        requestBody: veterinaryRequestBody("PetOwnerRequest", petOwnerRequestExample),
+        responses: {
+          "201": veterinarySuccessResponse("Pet owner profile created", "Pet owner profile created", {
+            petOwner: petOwnerExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "409": { description: "Pet owner profile already exists" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pet-owners/profile": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get pet owner profile",
+        description: "Loads the current owner profile or a targeted owner profile by query.",
+        security: [{ bearerAuth: [] }],
+        parameters: veterinaryTargetParameters,
+        responses: {
+          "200": veterinarySuccessResponse("Pet owner profile", "Pet owner profile loaded", {
+            petOwner: petOwnerExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      put: {
+        tags: ["Veterinary"],
+        summary: "Update pet owner profile",
+        description: "Updates the current owner profile or a targeted owner profile by query.",
+        security: [{ bearerAuth: [] }],
+        parameters: veterinaryTargetParameters,
+        requestBody: veterinaryRequestBody("PetOwnerUpdateRequest", {
+          phone: "+91 9876543212",
+          address: { line1: "24 Wellness Avenue", line2: "Bengaluru" },
+          emergencyContact: "Aarav Sharma",
+          emergencyPhone: "+91 9876543213"
+        }),
+        responses: {
+          "200": veterinarySuccessResponse("Pet owner profile updated", "Pet owner profile updated", {
+            petOwner: petOwnerExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Veterinary"],
+        summary: "Delete pet owner profile",
+        description: "Deletes a scoped pet owner profile when no pets remain attached.",
+        security: [{ bearerAuth: [] }],
+        parameters: veterinaryTargetParameters,
+        responses: {
+          "200": veterinarySuccessResponse("Pet owner profile deleted", "Pet owner profile deleted"),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" },
+          "409": { description: "Owner profile still has pets" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pets": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "List and filter pets",
+        description:
+          "Lists scoped pets with pagination plus owner, species, breed, age, and weight filters.",
+        security: [{ bearerAuth: [] }],
+        parameters: petFilterParameters,
+        responses: {
+          "200": veterinarySuccessResponse("Paginated scoped pets", "Pets loaded", {
+            pets: [petExample],
+            pagination: veterinaryPaginationExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      },
+      post: {
+        tags: ["Veterinary"],
+        summary: "Create pet",
+        description: "Creates a pet profile for the authenticated or supplied pet owner.",
+        security: [{ bearerAuth: [] }],
+        requestBody: veterinaryRequestBody("PetRequest", petRequestExample),
+        responses: {
+          "201": veterinarySuccessResponse("Pet created", "Pet created", { pet: petExample }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "409": { description: "Pet microchip number already exists" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pets/{petId}": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get pet by ID",
+        description: "Loads a scoped pet profile by pet ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("petId", veterinaryIds.petId)],
+        responses: {
+          "200": veterinarySuccessResponse("Pet", "Pet loaded", { pet: petExample }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      put: {
+        tags: ["Veterinary"],
+        summary: "Update pet",
+        description: "Updates a scoped pet profile by pet ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("petId", veterinaryIds.petId)],
+        requestBody: veterinaryRequestBody("PetUpdateRequest", {
+          breed: "Labrador Retriever",
+          weight: 29,
+          vaccinationStatus: "booster_due"
+        }),
+        responses: {
+          "200": veterinarySuccessResponse("Pet updated", "Pet updated", { pet: petExample }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Veterinary"],
+        summary: "Delete pet",
+        description: "Deletes a scoped pet and its veterinary child records.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("petId", veterinaryIds.petId)],
+        responses: {
+          "200": veterinarySuccessResponse("Pet and veterinary child records deleted", "Pet deleted"),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/veterinarians": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "List veterinarians",
+        description: "Lists veterinarian profiles with pagination, search, and sorting.",
+        security: [{ bearerAuth: [] }],
+        parameters: veterinaryListParameters("small animal", "clinicName"),
+        responses: {
+          "200": veterinarySuccessResponse("Paginated veterinarians", "Veterinarians loaded", {
+            veterinarians: [veterinarianExample],
+            pagination: veterinaryPaginationExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      },
+      post: {
+        tags: ["Veterinary"],
+        summary: "Create veterinarian profile",
+        description: "Creates a veterinarian profile linked to a doctor account.",
+        security: [{ bearerAuth: [] }],
+        requestBody: veterinaryRequestBody("VeterinarianRequest", veterinarianRequestExample),
+        responses: {
+          "201": veterinarySuccessResponse(
+            "Veterinarian profile created",
+            "Veterinarian profile created",
+            { veterinarian: veterinarianExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "409": { description: "Veterinarian profile or license already exists" }
+        }
+      }
+    },
+    "/api/v1/veterinary/veterinarians/{veterinarianId}": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get veterinarian profile",
+        description: "Loads a veterinarian profile by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("veterinarianId", veterinaryIds.veterinarianId)],
+        responses: {
+          "200": veterinarySuccessResponse("Veterinarian profile", "Veterinarian loaded", {
+            veterinarian: veterinarianExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      put: {
+        tags: ["Veterinary"],
+        summary: "Update veterinarian profile",
+        description: "Updates a veterinarian profile by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("veterinarianId", veterinaryIds.veterinarianId)],
+        requestBody: veterinaryRequestBody("VeterinarianUpdateRequest", {
+          specialization: ["Small animal medicine", "Emergency care"],
+          clinicName: "VetFlow Advanced Care",
+          yearsOfExperience: 9,
+          consultationFee: 850
+        }),
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Veterinarian profile updated",
+            "Veterinarian profile updated",
+            { veterinarian: veterinarianExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Veterinary"],
+        summary: "Delete veterinarian profile",
+        description: "Deletes a veterinarian profile by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("veterinarianId", veterinaryIds.veterinarianId)],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Veterinarian profile deleted",
+            "Veterinarian profile deleted"
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/vaccinations": {
+      post: {
+        tags: ["Veterinary"],
+        summary: "Add vaccination",
+        description: "Adds a vaccination record to a scoped pet.",
+        security: [{ bearerAuth: [] }],
+        requestBody: veterinaryRequestBody("VaccinationRequest", vaccinationRequestExample),
+        responses: {
+          "201": veterinarySuccessResponse("Vaccination added", "Vaccination added", {
+            vaccination: vaccinationExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/vaccinations/{vaccinationId}": {
+      patch: {
+        tags: ["Veterinary"],
+        summary: "Update vaccination",
+        description: "Updates a scoped vaccination record by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("vaccinationId", veterinaryIds.vaccinationId)],
+        requestBody: veterinaryRequestBody("VaccinationUpdateRequest", {
+          completedDate: "2026-09-01",
+          nextDose: "2027-09-01",
+          notes: "Annual booster administered."
+        }),
+        responses: {
+          "200": veterinarySuccessResponse("Vaccination updated", "Vaccination updated", {
+            vaccination: vaccinationExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Veterinary"],
+        summary: "Delete vaccination",
+        description: "Deletes a scoped vaccination record by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("vaccinationId", veterinaryIds.vaccinationId)],
+        responses: {
+          "200": veterinarySuccessResponse("Vaccination deleted", "Vaccination deleted"),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pets/{petId}/vaccinations": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get vaccinations by pet",
+        description: "Lists vaccination records for a scoped pet with pagination and search.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          veterinaryPathParameter("petId", veterinaryIds.petId),
+          ...veterinaryListParameters("Rabies", "dueDate")
+        ],
+        responses: {
+          "200": veterinarySuccessResponse("Paginated vaccinations for pet", "Vaccinations loaded", {
+            vaccinations: [vaccinationExample],
+            pagination: veterinaryPaginationExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pet-medical-records": {
+      post: {
+        tags: ["Veterinary"],
+        summary: "Create pet medical record",
+        description: "Creates a clinical veterinary medical record for a scoped pet.",
+        security: [{ bearerAuth: [] }],
+        requestBody: veterinaryRequestBody(
+          "PetMedicalRecordRequest",
+          petMedicalRecordRequestExample
+        ),
+        responses: {
+          "201": veterinarySuccessResponse(
+            "Pet medical record created",
+            "Pet medical record created",
+            { record: petMedicalRecordExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pets/{petId}/medical-records": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get pet medical history",
+        description: "Lists clinical veterinary medical records for a scoped pet.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          veterinaryPathParameter("petId", veterinaryIds.petId),
+          ...veterinaryListParameters("otitis", "-visitDate")
+        ],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Paginated pet medical records",
+            "Pet medical history loaded",
+            { records: [petMedicalRecordExample], pagination: veterinaryPaginationExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/pet-medical-records/{recordId}": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get pet medical record",
+        description: "Loads a scoped veterinary medical record by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("recordId", veterinaryIds.recordId)],
+        responses: {
+          "200": veterinarySuccessResponse("Pet medical record", "Pet medical record loaded", {
+            record: petMedicalRecordExample
+          }),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      patch: {
+        tags: ["Veterinary"],
+        summary: "Update pet medical record",
+        description: "Updates a scoped veterinary medical record by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("recordId", veterinaryIds.recordId)],
+        requestBody: veterinaryRequestBody("PetMedicalRecordUpdateRequest", {
+          diagnosis: "Otitis externa improving",
+          treatment: "Continue topical medication for three more days.",
+          followUpDate: "2026-08-18T09:20:00.000Z"
+        }),
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Pet medical record updated",
+            "Pet medical record updated",
+            { record: petMedicalRecordExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Veterinary"],
+        summary: "Delete pet medical record",
+        description: "Deletes a scoped veterinary medical record by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("recordId", veterinaryIds.recordId)],
+        responses: {
+          "200": veterinarySuccessResponse("Pet medical record deleted", "Pet medical record deleted"),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/ai-reports": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "List preliminary assessment reports",
+        description: "AI reports are preliminary assessment reports only and are not diagnoses.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...veterinaryListParameters("vomiting", "-generatedAt"),
+          { name: "petId", in: "query", schema: { type: "string" }, example: veterinaryIds.petId }
+        ],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Paginated preliminary assessment reports",
+            "Preliminary assessment reports loaded",
+            { reports: [aiReportExample], pagination: veterinaryPaginationExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" }
+        }
+      },
+      post: {
+        tags: ["Veterinary"],
+        summary: "Create preliminary assessment report",
+        description: "Creates an AI preliminary assessment report. This is not a diagnosis.",
+        security: [{ bearerAuth: [] }],
+        requestBody: veterinaryRequestBody("AiReportRequest", aiReportRequestExample),
+        responses: {
+          "201": veterinarySuccessResponse(
+            "Preliminary assessment report created",
+            "Preliminary assessment report created",
+            { report: aiReportExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/veterinary/ai-reports/{reportId}": {
+      get: {
+        tags: ["Veterinary"],
+        summary: "Get preliminary assessment report",
+        description: "Loads a scoped preliminary assessment report by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("reportId", veterinaryIds.reportId)],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Preliminary assessment report",
+            "Preliminary assessment report loaded",
+            { report: aiReportExample }
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Veterinary"],
+        summary: "Delete preliminary assessment report",
+        description: "Deletes a scoped preliminary assessment report by ID.",
+        security: [{ bearerAuth: [] }],
+        parameters: [veterinaryPathParameter("reportId", veterinaryIds.reportId)],
+        responses: {
+          "200": veterinarySuccessResponse(
+            "Preliminary assessment report deleted",
+            "Preliminary assessment report deleted"
+          ),
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { $ref: "#/components/responses/NotFound" }
         }
       }
     },

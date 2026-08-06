@@ -52,6 +52,8 @@ const Navbar = () => {
                   <p onClick={() => navigate('/health-profile')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>Health profile</p>
                   <p onClick={() => navigate('/medical-timeline')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>Medical timeline</p>
                   <p onClick={() => navigate('/family-health')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>Family health</p>
+                  <p onClick={() => navigate('/pet-owner')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>Pet owner dashboard</p>
+                  <p onClick={() => navigate('/pet-owner/pets')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>My pets</p>
                   <p onClick={() => navigate('/health-card')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>Health card</p>
                   <p onClick={() => navigate('/my-appointments')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>My appointments</p>
                   <p onClick={() => navigate('/security')} className='cursor-pointer rounded px-3 py-2 hover:bg-mist hover:text-primary'>Security</p>
@@ -77,6 +79,8 @@ const Navbar = () => {
             {token && <NavLink onClick={() => setShowMenu(false)} to='/health-profile'><p className='px-4 py-2 inline-block'>HEALTH PROFILE</p></NavLink>}
             {token && <NavLink onClick={() => setShowMenu(false)} to='/medical-timeline'><p className='px-4 py-2 inline-block'>MEDICAL TIMELINE</p></NavLink>}
             {token && <NavLink onClick={() => setShowMenu(false)} to='/family-health'><p className='px-4 py-2 inline-block'>FAMILY HEALTH</p></NavLink>}
+            {token && <NavLink onClick={() => setShowMenu(false)} to='/pet-owner'><p className='px-4 py-2 inline-block'>PET OWNER DASHBOARD</p></NavLink>}
+            {token && <NavLink onClick={() => setShowMenu(false)} to='/pet-owner/pets'><p className='px-4 py-2 inline-block'>MY PETS</p></NavLink>}
             {token && <NavLink onClick={() => setShowMenu(false)} to='/health-card'><p className='px-4 py-2 inline-block'>HEALTH CARD</p></NavLink>}
           </ul>
         </div>

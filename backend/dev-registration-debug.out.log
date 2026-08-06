@@ -1,0 +1,18 @@
+
+> medflow-backend@1.0.0 dev
+> tsx watch src/server.ts
+
+[02:48:29.705] [41mFATAL[49m: [36mquerySrv ETIMEOUT _mongodb._tcp.cluster0.axjrnkq.mongodb.net[39m
+    [35mservice[39m: "medflow-backend"
+    [35menvironment[39m: "development"
+    [35mevent[39m: "mongodb.startup_failed"
+    err: {
+      "type": "Error",
+      "message": "querySrv ETIMEOUT _mongodb._tcp.cluster0.axjrnkq.mongodb.net",
+      "stack":
+          Error: querySrv ETIMEOUT _mongodb._tcp.cluster0.axjrnkq.mongodb.net
+              at QueryReqWrap.onresolve [as oncomplete] (node:internal/dns/promises:295:17)
+      "code": "ETIMEOUT",
+      "syscall": "querySrv",
+      "hostname": "_mongodb._tcp.cluster0.axjrnkq.mongodb.net"
+    }
