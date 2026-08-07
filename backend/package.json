@@ -14,7 +14,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.json\" \"*.md\"",
     "test": "vitest run",
     "backfill:phase2b": "tsx src/scripts/backfillPhase2B.ts",
-    "seed:phase2c-demo": "tsx src/scripts/seedPhase2CDemo.ts"
+    "seed:phase2c-demo": "tsx src/scripts/seedPhase2CDemo.ts",
+    "seed:veterinary-demo": "tsx src/scripts/seedVeterinaryDemo.ts"
   },
   "author": "Mayank Tiwari",
   "license": "ISC",

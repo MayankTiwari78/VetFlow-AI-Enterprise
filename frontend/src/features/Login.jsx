@@ -71,7 +71,7 @@ const Login = () => {
   }, [authStatus, destination, navigate, token])
 
   return (
-    <AuthShell eyebrow='MedFlow AI account' title={state === 'Sign Up' ? 'Create your account' : 'Welcome back'} description={`Please ${state === 'Sign Up' ? 'sign up' : 'sign in'} to book appointments and manage your care securely.`}>
+    <AuthShell eyebrow='VetFlow AI account' title={state === 'Sign Up' ? 'Create your account' : 'Welcome back'} description={`Please ${state === 'Sign Up' ? 'sign up' : 'sign in'} to book veterinary appointments and manage your pet care securely.`}>
     <form onSubmit={onSubmitHandler} className='space-y-4 text-sm text-slate-600'>
         {state === 'Sign Up'
           ? <div className='w-full '>

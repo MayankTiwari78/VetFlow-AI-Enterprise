@@ -30,12 +30,8 @@ import doc12 from './doc12.png'
 import doc13 from './doc13.png'
 import doc14 from './doc14.png'
 import doc15 from './doc15.png'
-import Dermatologist from './Dermatologist.svg'
-import Gastroenterologist from './Gastroenterologist.svg'
-import General_physician from './General_physician.svg'
-import Gynecologist from './Gynecologist.svg'
-import Neurologist from './Neurologist.svg'
-import Pediatricians from './Pediatricians.svg'
+import veterinaryHero from './veterinary-hero.svg'
+import veterinaryCare from './veterinary-care.svg'
 
 const assetUrl = (asset) => typeof asset === 'string' ? asset : asset?.src
 
@@ -57,33 +53,23 @@ export const assets = {
     upload_icon: assetUrl(upload_icon),
     stripe_logo: assetUrl(stripe_logo),
     razorpay_logo: assetUrl(razorpay_logo)
+    ,veterinary_hero: assetUrl(veterinaryHero)
+    ,veterinary_care: assetUrl(veterinaryCare)
 }
 
 export const specialityData = [
-    {
-        speciality: 'General physician',
-        image: assetUrl(General_physician)
-    },
-    {
-        speciality: 'Gynecologist',
-        image: assetUrl(Gynecologist)
-    },
-    {
-        speciality: 'Dermatologist',
-        image: assetUrl(Dermatologist)
-    },
-    {
-        speciality: 'Pediatricians',
-        image: assetUrl(Pediatricians)
-    },
-    {
-        speciality: 'Neurologist',
-        image: assetUrl(Neurologist)
-    },
-    {
-        speciality: 'Gastroenterologist',
-        image: assetUrl(Gastroenterologist)
-    },
+    { speciality: 'General Veterinary Medicine', icon: '🩺' },
+    { speciality: 'Veterinary Surgery', icon: '🔬' },
+    { speciality: 'Veterinary Dermatology', icon: '🩹' },
+    { speciality: 'Veterinary Cardiology', icon: '❤️' },
+    { speciality: 'Veterinary Orthopedics', icon: '🦴' },
+    { speciality: 'Veterinary Dentistry', icon: '🦷' },
+    { speciality: 'Veterinary Ophthalmology', icon: '👁️' },
+    { speciality: 'Veterinary Neurology', icon: '🧠' },
+    { speciality: 'Veterinary Oncology', icon: '🎗️' },
+    { speciality: 'Internal Medicine', icon: '🫀' },
+    { speciality: 'Emergency & Critical Care', icon: '🚑' },
+    { speciality: 'Exotic Pet Medicine', icon: '🦎' },
 ]
 
 export const doctors = [
@@ -91,10 +77,10 @@ export const doctors = [
         _id: 'doc1',
         name: 'Dr. Richard James',
         image: assetUrl(doc1),
-        speciality: 'General physician',
-        degree: 'MBBS',
+        speciality: 'Dog Specialist',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Richard James has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Richard James has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Richard James is a dedicated veterinarian specializing in canine care, focusing on preventive medicine, early diagnosis, and effective treatment strategies for dogs of every breed.',
         fees: 50,
         address: {
             line1: '17th Cross, Richmond',
@@ -105,10 +91,10 @@ export const doctors = [
         _id: 'doc2',
         name: 'Dr. Emily Larson',
         image: assetUrl(doc2),
-        speciality: 'Gynecologist',
-        degree: 'MBBS',
+        speciality: 'Cat Specialist',
+        degree: 'DVM',
         experience: '3 Years',
-        about: 'Dr. Emily Larson has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Emily Larson has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Emily Larson is a feline-focused veterinarian committed to delivering comprehensive care for cats, from routine wellness exams to complex medical management.',
         fees: 60,
         address: {
             line1: '27th Cross, Richmond',
@@ -119,10 +105,10 @@ export const doctors = [
         _id: 'doc3',
         name: 'Dr. Sarah Patel',
         image: assetUrl(doc3),
-        speciality: 'Dermatologist',
-        degree: 'MBBS',
+        speciality: 'Bird Specialist',
+        degree: 'DVM',
         experience: '1 Year',
-        about: 'Dr. Sarah Patel has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Sarah Patel has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Sarah Patel specializes in avian medicine, providing expert care for pet birds including wellness exams, nutrition guidance, and treatment of common bird conditions.',
         fees: 30,
         address: {
             line1: '37th Cross, Richmond',
@@ -133,10 +119,10 @@ export const doctors = [
         _id: 'doc4',
         name: 'Dr. Christopher Lee',
         image: assetUrl(doc4),
-        speciality: 'Pediatricians',
-        degree: 'MBBS',
+        speciality: 'Exotic Animal',
+        degree: 'DVM',
         experience: '2 Years',
-        about: 'Dr. Christopher Lee has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Christopher Lee has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Christopher Lee provides specialized veterinary care for exotic pets including rabbits, reptiles, and small mammals, with a focus on species-appropriate medicine.',
         fees: 40,
         address: {
             line1: '47th Cross, Richmond',
@@ -147,10 +133,10 @@ export const doctors = [
         _id: 'doc5',
         name: 'Dr. Jennifer Garcia',
         image: assetUrl(doc5),
-        speciality: 'Neurologist',
-        degree: 'MBBS',
+        speciality: 'Orthopedic Vet',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Jennifer Garcia has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Jennifer Garcia has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Jennifer Garcia is an orthopedic veterinary specialist focused on diagnosing and treating bone, joint, and mobility conditions in pets of all sizes.',
         fees: 50,
         address: {
             line1: '57th Cross, Richmond',
@@ -161,10 +147,10 @@ export const doctors = [
         _id: 'doc6',
         name: 'Dr. Andrew Williams',
         image: assetUrl(doc6),
-        speciality: 'Neurologist',
-        degree: 'MBBS',
+        speciality: 'Surgery',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Andrew Williams has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Andrew Williams has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Andrew Williams is a veterinary surgeon with extensive experience in soft tissue and orthopedic surgical procedures, prioritizing safety and recovery.',
         fees: 50,
         address: {
             line1: '57th Cross, Richmond',
@@ -175,10 +161,10 @@ export const doctors = [
         _id: 'doc7',
         name: 'Dr. Christopher Davis',
         image: assetUrl(doc7),
-        speciality: 'General physician',
-        degree: 'MBBS',
+        speciality: 'Emergency Vet',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Christopher Davis has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Christopher Davis has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Christopher Davis provides emergency veterinary care for critical conditions, delivering rapid assessment and treatment when pets need it most.',
         fees: 50,
         address: {
             line1: '17th Cross, Richmond',
@@ -189,10 +175,10 @@ export const doctors = [
         _id: 'doc8',
         name: 'Dr. Timothy White',
         image: assetUrl(doc8),
-        speciality: 'Gynecologist',
-        degree: 'MBBS',
+        speciality: 'Vaccination Specialist',
+        degree: 'DVM',
         experience: '3 Years',
-        about: 'Dr. Timothy White has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Timothy White has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Timothy White specializes in preventive care and vaccination programs, helping pet owners keep their companions protected against preventable diseases.',
         fees: 60,
         address: {
             line1: '27th Cross, Richmond',
@@ -203,10 +189,10 @@ export const doctors = [
         _id: 'doc9',
         name: 'Dr. Ava Mitchell',
         image: assetUrl(doc9),
-        speciality: 'Dermatologist',
-        degree: 'MBBS',
+        speciality: 'Nutrition',
+        degree: 'DVM',
         experience: '1 Year',
-        about: 'Dr. Ava Mitchell has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Ava Mitchell has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Ava Mitchell focuses on veterinary nutrition, creating tailored diet and wellness plans that support pets through every life stage.',
         fees: 30,
         address: {
             line1: '37th Cross, Richmond',
@@ -217,10 +203,10 @@ export const doctors = [
         _id: 'doc10',
         name: 'Dr. Jeffrey King',
         image: assetUrl(doc10),
-        speciality: 'Pediatricians',
-        degree: 'MBBS',
+        speciality: 'Dental Care',
+        degree: 'DVM',
         experience: '2 Years',
-        about: 'Dr. Jeffrey King has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Jeffrey King has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Jeffrey King specializes in veterinary dentistry, providing dental cleanings, oral surgery, and preventive care to keep pets\' smiles healthy.',
         fees: 40,
         address: {
             line1: '47th Cross, Richmond',
@@ -231,10 +217,10 @@ export const doctors = [
         _id: 'doc11',
         name: 'Dr. Zoe Kelly',
         image: assetUrl(doc11),
-        speciality: 'Gastroenterologist',
-        degree: 'MBBS',
+        speciality: 'Dog Specialist',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Zoe Kelly has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Zoe Kelly has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Zoe Kelly is a canine care specialist dedicated to comprehensive dog health, from puppy wellness to senior care and chronic condition management.',
         fees: 50,
         address: {
             line1: '57th Cross, Richmond',
@@ -245,10 +231,10 @@ export const doctors = [
         _id: 'doc12',
         name: 'Dr. Patrick Harris',
         image: assetUrl(doc12),
-        speciality: 'Neurologist',
-        degree: 'MBBS',
+        speciality: 'Cat Specialist',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Patrick Harris has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Patrick Harris has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Patrick Harris provides expert feline medicine, understanding the unique needs of cats and creating calm, low-stress veterinary experiences.',
         fees: 50,
         address: {
             line1: '57th Cross, Richmond',
@@ -259,10 +245,10 @@ export const doctors = [
         _id: 'doc13',
         name: 'Dr. Chloe Evans',
         image: assetUrl(doc13),
-        speciality: 'General physician',
-        degree: 'MBBS',
+        speciality: 'Exotic Animal',
+        degree: 'DVM',
         experience: '4 Years',
-        about: 'Dr. Chloe Evans has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Chloe Evans has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Chloe Evans cares for exotic pets with species-specific expertise, from reptiles and birds to small mammals and amphibians.',
         fees: 50,
         address: {
             line1: '17th Cross, Richmond',
@@ -273,10 +259,10 @@ export const doctors = [
         _id: 'doc14',
         name: 'Dr. Ryan Martinez',
         image: assetUrl(doc14),
-        speciality: 'Gynecologist',
-        degree: 'MBBS',
+        speciality: 'Emergency Vet',
+        degree: 'DVM',
         experience: '3 Years',
-        about: 'Dr. Ryan Martinez has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Ryan Martinez has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Ryan Martinez delivers urgent and emergency veterinary care, providing compassionate treatment for pets in critical situations.',
         fees: 60,
         address: {
             line1: '27th Cross, Richmond',
@@ -287,10 +273,10 @@ export const doctors = [
         _id: 'doc15',
         name: 'Dr. Amelia Hill',
         image: assetUrl(doc15),
-        speciality: 'Dermatologist',
-        degree: 'MBBS',
+        speciality: 'Surgery',
+        degree: 'DVM',
         experience: '1 Year',
-        about: 'Dr. Amelia Hill has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies. Dr. Amelia Hill has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.',
+        about: 'Dr. Amelia Hill is a veterinary surgeon focused on advanced surgical care, from routine procedures to complex operations, with a commitment to excellent outcomes.',
         fees: 30,
         address: {
             line1: '37th Cross, Richmond',

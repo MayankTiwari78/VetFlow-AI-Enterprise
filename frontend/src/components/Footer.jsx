@@ -8,7 +8,7 @@ const Footer = () => {
 
         <div>
           <BrandLogo />
-          <p className='mt-5 w-full md:w-2/3 text-slate-600 leading-6'>Appointments, account protection, and care coordination in one dependable healthcare experience.</p>
+          <p className='mt-5 w-full md:w-2/3 text-slate-600 leading-6'>Appointments, vaccination tracking, and veterinary care coordination in one dependable pet care experience.</p>
         </div>
 
         <div>
@@ -24,8 +24,8 @@ const Footer = () => {
         <div>
           <p className='text-base font-semibold mb-5 text-ink'>SUPPORT</p>
           <ul className='flex flex-col gap-2 text-slate-600'>
-            <li>Care coordination</li>
-            <li>support@medflow.ai</li>
+            <li>Veterinary care coordination</li>
+            <li>support@vetflow.ai</li>
           </ul>
         </div>
 

@@ -123,7 +123,7 @@ const Security = () => {
 
   return (
     <div className='max-w-4xl mx-auto py-10 space-y-7 text-slate-600'>
-      <div><p className='mf-eyebrow'>Account protection</p><h1 className='mf-title'>Security center</h1><p className='mf-copy'>Protect your MedFlow AI account with an authenticator app and review every signed-in device.</p></div>
+      <div><p className='mf-eyebrow'>Account protection</p><h1 className='mf-title'>Security center</h1><p className='mf-copy'>Protect your VetFlow AI account with an authenticator app and review every signed-in device.</p></div>
       <div className='mf-card p-5 sm:p-6 space-y-4'>
         <div className='flex items-center justify-between gap-3'>
           <p className='text-xl font-semibold text-ink'>Authenticator app</p>

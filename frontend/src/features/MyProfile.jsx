@@ -60,7 +60,7 @@ const MyProfile = () => {
 
     return userData ? (
         <section className='max-w-2xl py-10'>
-        <div className='mb-7'><p className='mf-eyebrow'>Account settings</p><h1 className='mf-title'>My profile</h1><p className='mf-copy'>Keep your contact and personal details ready for care coordination.</p></div>
+        <div className='mb-7'><p className='mf-eyebrow'>Account settings</p><h1 className='mf-title'>My profile</h1><p className='mf-copy'>Keep your contact and personal details ready for veterinary care coordination.</p></div>
         <div className='mf-card flex flex-col gap-3 p-6 text-sm'>
 
             {isEdit

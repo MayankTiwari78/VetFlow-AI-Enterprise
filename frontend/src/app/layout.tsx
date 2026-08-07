@@ -7,7 +7,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "MedFlow AI",
-  description: "Intelligent healthcare appointment and account management."
+  description: "Intelligent veterinary care, pet management, and appointment platform."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

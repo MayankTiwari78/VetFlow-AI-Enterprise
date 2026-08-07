@@ -11,6 +11,7 @@ import {
 } from "../api/authClient";
 import { publicEnv } from "../lib/env";
 import { normalizeEntityId } from "../lib/entityId";
+import { normalizeDoctors } from "../lib/veterinaryDisplay";
 
 export const AppContext = createContext();
 
@@ -56,19 +57,21 @@ const AppContextProvider = ({ children }) => {
       if (data.success) {
         setDoctors(
           Array.isArray(data.doctors)
-            ? data.doctors.map((doctor) => ({ ...doctor, _id: normalizeEntityId(doctor._id) }))
+            ? normalizeDoctors(
+                data.doctors.map((doctor) => ({ ...doctor, _id: normalizeEntityId(doctor._id) }))
+              )
             : []
         );
       } else {
         setDoctors([]);
-        setDoctorsError("The clinician directory is temporarily unavailable. Please try again shortly.");
+        setDoctorsError("The veterinary directory is temporarily unavailable. Please try again shortly.");
       }
     } catch (error) {
       setDoctors([]);
       setDoctorsError(
         error.response
-          ? "The clinician directory is temporarily unavailable. Please try again shortly."
-          : "We could not reach the clinician directory. Check the local service and try again."
+          ? "The veterinary directory is temporarily unavailable. Please try again shortly."
+          : "We could not reach the veterinary directory. Check the local service and try again."
       );
     } finally {
       setDoctorsLoading(false);

@@ -31,7 +31,7 @@ const VerifyEmail = () => {
   }, [backendUrl, searchParams])
 
   return (
-    <AuthShell eyebrow='Identity check' title='Verify your email' description='Email verification protects account recovery and important care notifications.'>
+    <AuthShell eyebrow='Identity check' title='Verify your email' description='Email verification protects account recovery and important pet care notifications.'>
       <div className='text-center'>
         <div className='rounded-md border border-line bg-mist p-5 text-sm text-slate-700'>{status}</div>
         <div className='mt-6 flex justify-center gap-4 text-sm'>

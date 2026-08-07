@@ -4,6 +4,7 @@ import { useContext, useEffect, useMemo, useState } from 'react'
 import { isAuthSessionHandledError } from '../api/authClient'
 import { AppContext } from '../context/AppContext'
 import { useProtectedPatientRoute } from '../hooks/useProtectedPatientRoute'
+import { cleanVetName } from '../lib/veterinaryDisplay'
 
 const labelForType = (type) => ({
   consultation_summary: 'Consultation',
@@ -58,7 +59,7 @@ const MedicalTimeline = () => {
       id: appointment._id,
       kind: appointment.status || (appointment.cancelled ? 'cancelled' : appointment.isCompleted ? 'completed' : 'scheduled'),
       date: appointment.date,
-      title: appointment.docData?.name || 'Appointment',
+      title: cleanVetName(appointment.docData?.name) || 'Appointment',
       body: `${appointment.slotDate}, ${appointment.slotTime}`,
       status: appointment.status,
       source: 'appointment'
@@ -75,7 +76,7 @@ const MedicalTimeline = () => {
   return (
     <main className='py-10'>
       <section className='mb-7 flex flex-col justify-between gap-5 border-b border-line pb-7 lg:flex-row lg:items-end'>
-        <div><p className='mf-eyebrow'>Protected patient timeline</p><h1 className='mf-title'>Medical timeline</h1><p className='mf-copy'>Finalized patient-visible records, appointment history, allergies, conditions, vaccinations and medication plans.</p></div>
+        <div><p className='mf-eyebrow'>Protected pet health timeline</p><h1 className='mf-title'>Medical timeline</h1><p className='mf-copy'>Finalized pet-visible records, veterinary appointment history, allergies, conditions, vaccinations and medication plans.</p></div>
         <select className='mf-field max-w-xs' value={filter} onChange={(event) => setFilter(event.target.value)}>
           <option value='all'>All timeline items</option>
           <option value='record'>Medical records</option>
@@ -105,7 +106,7 @@ const MedicalTimeline = () => {
             {item.details?.vaccine && <p className='mt-4 text-sm text-slate-600'>{item.details.vaccine.name} administered on {item.details.vaccine.administeredOn}</p>}
           </article>
         ))}
-        {items.length === 0 && <div className='mf-card p-10 text-center text-sm text-slate-500'>No finalized patient-visible timeline items match this filter.</div>}
+        {items.length === 0 && <div className='mf-card p-10 text-center text-sm text-slate-500'>No finalized pet-visible timeline items match this filter.</div>}
       </section>
     </main>
   )

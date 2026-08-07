@@ -27,7 +27,7 @@ const Navbar = () => {
           <hr className='border-none outline-none h-0.5 bg-teal w-3/5 m-auto hidden' />
         </NavLink>
         <NavLink to='/doctors' >
-          <li className='py-2 hover:text-primary'>ALL DOCTORS</li>
+          <li className='py-2 hover:text-primary'>VETERINARIANS</li>
           <hr className='border-none outline-none h-0.5 bg-teal w-3/5 m-auto hidden' />
         </NavLink>
         <NavLink to='/about' >
@@ -73,7 +73,7 @@ const Navbar = () => {
           </div>
           <ul className='flex flex-col items-center gap-2 mt-5 px-5 text-lg font-semibold'>
             <NavLink onClick={() => setShowMenu(false)} to='/'><p className='px-4 py-2 inline-block'>HOME</p></NavLink>
-            <NavLink onClick={() => setShowMenu(false)} to='/doctors' ><p className='px-4 py-2 inline-block'>ALL DOCTORS</p></NavLink>
+            <NavLink onClick={() => setShowMenu(false)} to='/doctors' ><p className='px-4 py-2 inline-block'>VETERINARIANS</p></NavLink>
             <NavLink onClick={() => setShowMenu(false)} to='/about' ><p className='px-4 py-2 inline-block'>ABOUT</p></NavLink>
             <NavLink onClick={() => setShowMenu(false)} to='/contact' ><p className='px-4 py-2 inline-block'>CONTACT</p></NavLink>
             {token && <NavLink onClick={() => setShowMenu(false)} to='/health-profile'><p className='px-4 py-2 inline-block'>HEALTH PROFILE</p></NavLink>}

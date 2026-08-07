@@ -45,7 +45,7 @@ const HealthCard = () => {
       <section className='grid gap-5 lg:grid-cols-[1fr_0.8fr]'>
         <article className='mf-card p-6 print:border print:shadow-none'>
           <div className='flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between'>
-            <div className='flex items-center gap-4'><img className='h-16 w-16 rounded-full border border-line object-cover' src={card?.patient?.image} alt='' /><div><p className='mf-eyebrow'>MedFlow health card</p><h2 className='text-2xl font-semibold text-ink'>{card?.patient?.name}</h2><p className='text-sm text-slate-500'>{card?.cardId}</p></div></div>
+            <div className='flex items-center gap-4'><img className='h-16 w-16 rounded-full border border-line object-cover' src={card?.patient?.image} alt='' /><div><p className='mf-eyebrow'>VetFlow health card</p><h2 className='text-2xl font-semibold text-ink'>{card?.patient?.name}</h2><p className='text-sm text-slate-500'>{card?.cardId}</p></div></div>
             {card?.qrDataUrl && <img className='h-32 w-32 rounded-md border border-line bg-white p-2' src={card.qrDataUrl} alt='Health card QR code' />}
           </div>
           <dl className='mt-8 grid gap-4 text-sm sm:grid-cols-3'>

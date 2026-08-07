@@ -7,7 +7,7 @@ const BrandLogo = ({ onClick, compact = false }) => {
       </span>
       <span className='text-left leading-none'>
         <span className='block text-xl font-bold text-ink'>MedFlow <span className='text-teal'>AI</span></span>
-        {!compact && <span className='mt-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500'>Connected healthcare</span>}
+        {!compact && <span className='mt-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500'>Connected veterinary care</span>}
       </span>
     </>
   )

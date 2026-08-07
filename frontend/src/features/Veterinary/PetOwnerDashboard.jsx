@@ -6,6 +6,7 @@ import { AppContext } from '../../context/AppContext'
 import { isAuthSessionHandledError } from '../../api/authClient'
 import { useProtectedPatientRoute } from '../../hooks/useProtectedPatientRoute'
 import { useNavigate, useParams } from '../../lib/routerCompat'
+import { cleanVetName } from '../../lib/veterinaryDisplay'
 
 const petDraft = {
   name: '',
@@ -531,7 +532,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {view === 'medical' && <DataTable columns={recordColumns} rows={records} emptyTitle='No pet medical records found.' />}
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
       {view === 'ai' && <div className='space-y-4'>{reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}{reports.length === 0 && <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />}</div>}
-      {view === 'appointments' && <DataTable columns={[{ key: 'docData', label: 'Veterinarian', render: (item) => item.docData?.name || 'Veterinarian' }, { key: 'slotDate', label: 'Date', render: (item) => formatDate(item.slotDate) }, { key: 'slotTime', label: 'Time' }, { key: 'payment', label: 'Payment', render: (item) => item.payment ? 'Paid' : 'Pending' }]} rows={appointments} emptyTitle='No upcoming appointments found.' />}
+      {view === 'appointments' && <DataTable columns={[{ key: 'docData', label: 'Veterinarian', render: (item) => cleanVetName(item.docData?.name) || 'Veterinarian' }, { key: 'slotDate', label: 'Date', render: (item) => formatDate(item.slotDate) }, { key: 'slotTime', label: 'Time' }, { key: 'payment', label: 'Payment', render: (item) => item.payment ? 'Paid' : 'Pending' }]} rows={appointments} emptyTitle='No upcoming appointments found.' />}
       {view === 'profile' && (
         <form className='mf-card grid gap-4 p-6 sm:grid-cols-2' onSubmit={saveOwner}>
           {formError && <div role='alert' className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2'>{formError}</div>}

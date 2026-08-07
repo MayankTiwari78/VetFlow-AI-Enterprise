@@ -1,0 +1,24 @@
+<svg width="760" height="620" viewBox="0 0 760 620" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="760" height="620" rx="48" fill="#DDF0F0"/>
+  <circle cx="610" cy="118" r="72" fill="#B9DDE0"/>
+  <path d="M87 480C166 397 241 420 301 466C364 515 447 529 526 464C589 412 656 424 708 485V620H87V480Z" fill="#BCE9E4"/>
+  <rect x="306" y="125" width="222" height="336" rx="111" fill="#F7FBFB"/>
+  <circle cx="417" cy="180" r="65" fill="#C98E6B"/>
+  <path d="M353 175C356 113 387 84 422 84C467 84 491 118 482 183C454 159 391 151 353 175Z" fill="#153048"/>
+  <path d="M333 296C333 245 370 214 417 214C464 214 501 245 501 296V445H333V296Z" fill="#FFFFFF"/>
+  <path d="M417 250V367" stroke="#2B7A78" stroke-width="13" stroke-linecap="round"/>
+  <circle cx="417" cy="380" r="24" stroke="#2B7A78" stroke-width="11"/>
+  <path d="M346 267C319 293 302 336 310 376M488 267C515 293 532 336 524 376" stroke="#153048" stroke-width="10" stroke-linecap="round"/>
+  <ellipse cx="252" cy="429" rx="139" ry="108" fill="#D99B73"/>
+  <path d="M157 370L123 285C121 278 129 272 135 277L210 341L157 370Z" fill="#B87552"/>
+  <path d="M342 370L376 285C379 278 370 272 364 277L290 341L342 370Z" fill="#B87552"/>
+  <ellipse cx="205" cy="411" rx="10" ry="13" fill="#153048"/>
+  <ellipse cx="300" cy="411" rx="10" ry="13" fill="#153048"/>
+  <path d="M239 447C246 454 257 454 264 447" stroke="#153048" stroke-width="7" stroke-linecap="round"/>
+  <path d="M247 432L253 432" stroke="#153048" stroke-width="10" stroke-linecap="round"/>
+  <path d="M173 469C207 505 298 506 331 469" stroke="#F7FBFB" stroke-width="20" stroke-linecap="round"/>
+  <rect x="48" y="64" width="180" height="84" rx="16" fill="white"/>
+  <path d="M87 95C77 84 59 92 63 107C67 120 87 130 87 130C87 130 107 120 111 107C115 92 97 84 87 95Z" fill="#E86D6D"/>
+  <text x="125" y="101" fill="#2B7A78" font-family="Arial" font-size="14" font-weight="700">PET WELLNESS</text>
+  <text x="125" y="126" fill="#153048" font-family="Arial" font-size="17" font-weight="700">Care in one place</text>
+</svg>

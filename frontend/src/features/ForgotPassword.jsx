@@ -25,7 +25,7 @@ const ForgotPassword = () => {
   }
 
   return (
-    <AuthShell eyebrow='Account recovery' title='Reset your password' description='Enter the email linked to your patient account. We will send a time-limited reset link if the account exists.'>
+    <AuthShell eyebrow='Account recovery' title='Reset your password' description='Enter the email linked to your pet owner account. We will send a time-limited reset link if the account exists.'>
     <form onSubmit={onSubmitHandler} className='space-y-5'>
         <div className='w-full'>
           <label className='mf-label' htmlFor='recovery-email'>Email</label>

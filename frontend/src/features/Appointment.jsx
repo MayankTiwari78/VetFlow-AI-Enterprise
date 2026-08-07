@@ -114,10 +114,10 @@ const Appointment = () => {
     if (!docInfo) {
         return <section className='min-h-[60vh] py-14'>
             <div className='mx-auto max-w-2xl border-y border-line bg-white px-6 py-12 text-center'>
-                <p className='mf-eyebrow'>Clinician profile</p>
+                <p className='mf-eyebrow'>Veterinarian profile</p>
                 <h1 className='mt-2 text-3xl font-semibold text-ink'>This booking profile is unavailable</h1>
-                <p className='mt-3 text-sm leading-6 text-slate-600'>{doctorsError || 'The clinician may no longer be accepting appointments, or the link may be out of date.'}</p>
-                <button type='button' onClick={() => navigate('/doctors')} className='mf-button mt-6'>Browse clinicians</button>
+                <p className='mt-3 text-sm leading-6 text-slate-600'>{doctorsError || 'The veterinarian may no longer be accepting appointments, or the link may be out of date.'}</p>
+                <button type='button' onClick={() => navigate('/doctors')} className='mf-button mt-6'>Browse veterinarians</button>
             </div>
         </section>
     }
@@ -140,10 +140,11 @@ const Appointment = () => {
                         <p>{docInfo.degree} - {docInfo.speciality}</p>
                         <button className='py-1 px-2 border border-line text-xs rounded-full'>{docInfo.experience}</button>
                     </div>
+                    <p className='mt-2 text-sm font-medium text-primary'>{docInfo.clinicName}</p>
 
                     {/* ----- Doc About ----- */}
                     <div>
-                        <p className='flex items-center gap-1 text-sm font-medium text-[#262626] mt-3'>About <img className='w-3' src={assets.info_icon} alt="" /></p>
+                        <p className='flex items-center gap-1 text-sm font-medium text-[#262626] mt-3'>About <img className='w-5' src={assets.info_icon} alt="" /></p>
                         <p className='text-sm text-gray-600 max-w-[700px] mt-1'>{docInfo.about}</p>
                     </div>
 

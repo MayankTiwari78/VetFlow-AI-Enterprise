@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import { assets } from '../assets/assets'
 import { isAuthSessionHandledError } from '../api/authClient'
 import { useProtectedPatientRoute } from '../hooks/useProtectedPatientRoute'
+import { normalizeDoctor } from '../lib/veterinaryDisplay'
 
 const MyAppointments = () => {
 
@@ -34,7 +35,12 @@ const MyAppointments = () => {
         try {
 
             const { data } = await axios.get(backendUrl + '/api/user/appointments', { headers: { token } })
-            setAppointments(data.appointments.reverse())
+            setAppointments(
+              (data.appointments || []).reverse().map((appointment) => ({
+                ...appointment,
+                docData: normalizeDoctor(appointment.docData)
+              }))
+            )
 
         } catch (error) {
             console.log(error)
@@ -145,7 +151,7 @@ const MyAppointments = () => {
 
     return (
         <section className='py-10'>
-            <div className='mb-8'><p className='mf-eyebrow'>Your care plan</p><h1 className='mf-title'>My appointments</h1><p className='mf-copy'>Review appointment details, payments, and changes from one place.</p></div>
+            <div className='mb-8'><p className='mf-eyebrow'>Your pet care plan</p><h1 className='mf-title'>My appointments</h1><p className='mf-copy'>Review veterinary appointment details, payments, and changes from one place.</p></div>
             <div className='space-y-4'>
                 {appointments.map((item, index) => (
                     <div key={index} className='mf-card grid grid-cols-[1fr_2fr] gap-4 p-4 sm:flex sm:gap-6 sm:p-5'>
@@ -174,7 +180,7 @@ const MyAppointments = () => {
                         </div>
                     </div>
                 ))}
-                {appointments.length === 0 && <div className='mf-card p-10 text-center'><p className='font-semibold text-ink'>No appointments yet</p><p className='mt-2 text-sm text-slate-600'>When you book care, its details and payment options will appear here.</p><button onClick={() => navigate('/doctors')} className='mf-button mt-5'>Find a clinician</button></div>}
+                {appointments.length === 0 && <div className='mf-card p-10 text-center'><p className='font-semibold text-ink'>No appointments yet</p><p className='mt-2 text-sm text-slate-600'>When you book veterinary care, its details and payment options will appear here.</p><button onClick={() => navigate('/doctors')} className='mf-button mt-5'>Find a veterinarian</button></div>}
             </div>
         </section>
     )
