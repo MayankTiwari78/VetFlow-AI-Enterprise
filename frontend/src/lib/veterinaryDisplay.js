@@ -60,6 +60,21 @@ const CLINIC_MAP = {
 
 const DEFAULT_CLINIC = 'MedFlow Veterinary Center'
 
+const VET_IMAGE_MAP = {
+  'Dr. Meera Rao': assets.dr_meera_rao,
+  'Dr. Arjun Sen': assets.dr_arjun_sen,
+  'Dr. Priya Nair': assets.dr_priya_nair,
+  'Dr. Vikram Singh': assets.dr_vikram_singh,
+  'Dr. Ananya Iyer': assets.dr_ananya_iyer,
+  'Dr. Rohan Gupta': assets.dr_rohan_gupta,
+  'Dr. Kavya Menon': assets.dr_kavya_menon,
+  'Dr. Aditya Kumar': assets.dr_aditya_kumar,
+  'Dr. Sneha Patel': assets.dr_sneha_patel,
+  'Dr. Rahul Verma': assets.dr_rahul_verma,
+  'Dr. Divya Sharma': assets.dr_divya_sharma,
+  'Dr. Nikhil Joshi': assets.dr_nikhil_joshi
+}
+
 export const cleanVetName = (name) => {
   if (!name) return ''
   let cleaned = String(name)
@@ -85,6 +100,8 @@ export const cleanVetAddress = (address) => {
 
 export const vetAvatarFor = (doctor, index = 0) => {
   if (doctor?.image && !doctor.image.includes('data:image/svg+xml')) return doctor.image
+  const name = cleanVetName(doctor?.name)
+  if (name && VET_IMAGE_MAP[name]) return VET_IMAGE_MAP[name]
   const avatars = [assets.doc1, assets.doc2, assets.doc3, assets.doc4, assets.doc5, assets.doc6, assets.doc7, assets.doc8, assets.doc9, assets.doc10, assets.doc11, assets.doc12, assets.doc13, assets.doc14, assets.doc15]
   const hash = String(doctor?._id || index).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
   return avatars[hash % avatars.length]

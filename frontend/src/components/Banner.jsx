@@ -1,29 +1,58 @@
 import React from 'react'
+import { motion } from 'framer-motion'
 import { assets } from '../assets/assets'
 import { useNavigate } from '../lib/routerCompat'
+import { ArrowRight } from 'lucide-react'
 
 const Banner = () => {
+  const navigate = useNavigate()
 
-    const navigate = useNavigate()
+  return (
+    <section className='relative isolate overflow-hidden rounded-[32px] bg-ink py-16 shadow-soft-xl sm:py-24'>
+      <div className='absolute inset-0 -z-10 bg-[linear-gradient(135deg,rgba(15,157,138,0.34),rgba(15,23,42,0.96)_42%,rgba(56,217,169,0.24))]' />
 
-    return (
-        <section className='relative flex overflow-hidden rounded-lg bg-ink px-6 sm:px-10 md:px-14 lg:px-12'>
+      <div className='grid items-center gap-12 px-6 sm:px-10 lg:grid-cols-[1fr_0.8fr]'>
+        {/* Left Side */}
+        <motion.div
+          initial={{ opacity: 0, x: -30 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: [0.21, 0.47, 0.32, 0.98] }}
+        >
+          <h2 className='text-4xl font-extrabold leading-tight text-white sm:text-5xl'>
+            Give every pet a healthier <span className='text-accent'>tomorrow.</span>
+          </h2>
+          <p className='mt-4 max-w-lg text-lg text-white/80'>
+            Join thousands of pet families who trust MedFlow AI for connected veterinary care, AI-powered insights, and seamless appointment management.
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.02, x: 3 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => { navigate('/pet-owner/pets/register'); scrollTo(0, 0) }}
+            className='mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-sm font-semibold text-ink shadow-soft-lg transition-all duration-200 hover:shadow-soft-xl'
+          >
+            Register your pet
+            <ArrowRight className='h-4 w-4' />
+          </motion.button>
+        </motion.div>
 
-            {/* ------- Left Side ------- */}
-            <div className='flex-1 py-8 sm:py-10 md:py-16 lg:py-24 lg:pl-5'>
-                <div className='text-xl sm:text-2xl md:text-3xl lg:text-5xl font-semibold text-white'>
-                    <p>Give every pet a healthier</p>
-                    <p className='mt-2 text-[#9CE5DE]'>tomorrow.</p>
-                </div>
-                <button onClick={() => { navigate('/pet-owner/pets/register'); scrollTo(0, 0) }} className='mf-button-secondary border-white bg-white mt-6'>Register your pet</button>
-            </div>
-
-            {/* ------- Right Side ------- */}
-            <div className='hidden md:block md:w-1/2 lg:w-[370px] relative'>
-                <img className='h-full w-full absolute bottom-0 right-0 object-contain' src={assets.veterinary_care} alt="Pet wellness illustration" />
-            </div>
-        </section>
-    )
+        {/* Right Side */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: [0.21, 0.47, 0.32, 0.98] }}
+          className='relative hidden md:block'
+        >
+          <img
+            className='h-full w-full object-contain'
+            src={assets.veterinary_care}
+            alt="Pet wellness illustration"
+          />
+        </motion.div>
+      </div>
+    </section>
+  )
 }
 
 export default Banner

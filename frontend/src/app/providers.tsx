@@ -10,10 +10,12 @@ import AppContextProvider from "../context/AppContext";
 export const Providers = ({ children }: { children: ReactNode }) => (
   <AppContextProvider>
     <ToastContainer />
-    <div className="mx-4 sm:mx-[10%]">
-      <Navbar />
-      {children}
-      <Footer />
-    </div>
+    <Navbar />
+    <main className="pt-20">
+      <div className="mf-page">
+        {children}
+      </div>
+    </main>
+    <Footer />
   </AppContextProvider>
 );

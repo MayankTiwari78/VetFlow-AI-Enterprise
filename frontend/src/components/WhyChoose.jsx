@@ -1,28 +1,68 @@
 import React from 'react'
+import { motion } from 'framer-motion'
+import { UserPlus, PawPrint, Stethoscope, ArrowRight } from 'lucide-react'
 
-const reasons = [
-  { icon: '🤖', title: 'AI Assisted Reports', copy: 'Get AI-powered summaries that help you understand your pet\'s health information and prepare for veterinary visits.' },
-  { icon: '👨‍⚕️', title: 'Certified Veterinarians', copy: 'Connect with licensed and experienced veterinarians across every specialty your companion may need.' },
-  { icon: '💉', title: 'Vaccination Tracking', copy: 'Never miss a booster. Follow vaccine schedules, due dates, and preventive-care milestones in one timeline.' },
-  { icon: '📋', title: 'Medical Timeline', copy: 'Keep every diagnosis, prescription, and treatment record organized in a clear, chronological pet health history.' },
-  { icon: '🔒', title: 'Secure Records', copy: 'Your pet\'s medical data is protected with enterprise-grade security and strict privacy controls.' },
-  { icon: '📅', title: 'Appointment Booking', copy: 'Find the right veterinarian, check live availability, and book appointments in just a few clicks.' }
+const steps = [
+  { icon: UserPlus, title: 'Register', copy: 'Create your free account in under a minute. Set up your profile and connect with trusted veterinarians.', step: '01', color: 'from-primary/10 to-primary/5' },
+  { icon: PawPrint, title: 'Add Pets', copy: 'Add your pets with their medical history, vaccination records, and unique health needs. All in one place.', step: '02', color: 'from-secondary/10 to-secondary/5' },
+  { icon: Stethoscope, title: 'Consult Vet', copy: 'Book appointments, get AI-powered health insights, and stay connected with your veterinary care team.', step: '03', color: 'from-accent/10 to-accent/5' },
 ]
 
 const WhyChoose = () => (
-  <section className='mf-section'>
-    <div className='max-w-3xl'>
-      <p className='mf-eyebrow'>Why choose VetFlow AI</p>
-      <h2 className='mf-title'>Pet care that puts you and your companion first</h2>
-      <p className='mf-copy'>We combine modern technology with trusted veterinary expertise so every pet gets the care they deserve.</p>
+  <section className='py-16 sm:py-20'>
+    <div className='text-center max-w-3xl mx-auto'>
+      <motion.p
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className='text-xs font-bold uppercase tracking-[0.15em] text-primary'
+      >
+        How it works
+      </motion.p>
+      <motion.h2
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.1 }}
+        className='mt-4 text-4xl font-bold leading-tight text-ink sm:text-5xl'
+      >
+        Three simple steps to better pet care
+      </motion.h2>
+      <motion.p
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.2 }}
+        className='mt-4 mx-auto max-w-2xl text-lg leading-relaxed text-muted'
+      >
+        From registration to consultation, we make pet healthcare seamless and stress-free.
+      </motion.p>
     </div>
-    <div className='mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-      {reasons.map((reason) => (
-        <article key={reason.title} className='mf-card p-6'>
-          <span className='grid h-12 w-12 place-items-center rounded-lg bg-[#E7F4F5] text-2xl' aria-hidden='true'>{reason.icon}</span>
-          <h3 className='mt-5 text-lg font-semibold text-ink'>{reason.title}</h3>
-          <p className='mt-2 text-sm leading-6 text-slate-600'>{reason.copy}</p>
-        </article>
+    <div className='mt-12 grid gap-8 md:grid-cols-3'>
+      {steps.map((step, index) => (
+        <motion.div
+          key={step.title}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: index * 0.15, duration: 0.6, ease: [0.21, 0.47, 0.32, 0.98] }}
+          className='relative'
+        >
+          <div className='group relative overflow-hidden rounded-[24px] border border-white/70 bg-white/80 p-8 shadow-soft backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover'>
+            <div className={`absolute inset-0 bg-gradient-to-br ${step.color} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
+            <div className='relative z-10'>
+              <span className='text-4xl font-black text-primary/20'>{step.step}</span>
+              <div className={`mt-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br ${step.color} text-primary`}>
+                <step.icon className='h-6 w-6' strokeWidth={1.5} />
+              </div>
+              <h3 className='mt-6 text-xl font-bold text-ink'>{step.title}</h3>
+              <p className='mt-3 text-base leading-relaxed text-muted'>{step.copy}</p>
+              {index < steps.length - 1 && (
+                <ArrowRight className='hidden md:block absolute -right-8 top-1/2 -translate-y-1/2 h-6 w-6 text-muted/30' strokeWidth={1} />
+              )}
+            </div>
+          </div>
+        </motion.div>
       ))}
     </div>
   </section>

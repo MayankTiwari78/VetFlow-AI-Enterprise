@@ -6,15 +6,12 @@ import { useNavigate, useSearchParams } from '../lib/routerCompat'
 import AuthShell from '../components/AuthShell'
 import { resetSessionExpiredNotification } from '../api/authClient'
 import { safeLoginDestination } from '../lib/authNavigation'
+import { Eye, EyeOff, Mail, Lock, Globe2, Apple } from 'lucide-react'
 
 const Login = () => {
-
-  const [state, setState] = useState('Sign Up')
-
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const loginNavigationStarted = useRef(false)
 
@@ -24,44 +21,28 @@ const Login = () => {
   const { authStatus, backendUrl, token, setToken } = useContext(AppContext)
 
   const onSubmitHandler = async (event) => {
-    event.preventDefault();
+    event.preventDefault()
     setLoading(true)
 
     try {
-      if (state === 'Sign Up') {
+      const { data } = await axios.post(backendUrl + '/api/user/login', { email, password }, { withCredentials: true })
 
-        const { data } = await axios.post(backendUrl + '/api/user/register', { name, email, password, confirmPassword }, { withCredentials: true })
-
-        if (data.success) {
-          toast.success(data.message)
-          setState('Login')
-        } else {
-          toast.error(data.message)
-        }
-
+      if (data.success && data.data?.requiresTwoFactor) {
+        sessionStorage.setItem('patientTwoFactorChallenge', JSON.stringify({ ...data.data, returnTo: destination }))
+        navigate('/two-factor-login')
+      } else if (data.success) {
+        resetSessionExpiredNotification()
+        setToken(data.token)
+        loginNavigationStarted.current = true
+        navigate(destination)
       } else {
-
-        const { data } = await axios.post(backendUrl + '/api/user/login', { email, password }, { withCredentials: true })
-
-        if (data.success && data.data?.requiresTwoFactor) {
-          sessionStorage.setItem('patientTwoFactorChallenge', JSON.stringify({ ...data.data, returnTo: destination }))
-          navigate('/two-factor-login')
-        } else if (data.success) {
-          resetSessionExpiredNotification()
-          setToken(data.token)
-          loginNavigationStarted.current = true
-          navigate(destination)
-        } else {
-          toast.error(data.message)
-        }
-
+        toast.error(data.message)
       }
     } catch (error) {
       toast.error(error.response?.data?.message || error.message)
     } finally {
       setLoading(false)
     }
-
   }
 
   useEffect(() => {
@@ -71,39 +52,95 @@ const Login = () => {
   }, [authStatus, destination, navigate, token])
 
   return (
-    <AuthShell eyebrow='VetFlow AI account' title={state === 'Sign Up' ? 'Create your account' : 'Welcome back'} description={`Please ${state === 'Sign Up' ? 'sign up' : 'sign in'} to book veterinary appointments and manage your pet care securely.`}>
-    <form onSubmit={onSubmitHandler} className='space-y-4 text-sm text-slate-600'>
-        {state === 'Sign Up'
-          ? <div className='w-full '>
-            <p className='mf-label'>Full name</p>
-            <input onChange={(e) => setName(e.target.value)} value={name} className='mf-field' type="text" required />
-          </div>
-          : null
-        }
-        <div className='w-full '>
-          <p className='mf-label'>Email</p>
-          <input onChange={(e) => setEmail(e.target.value)} value={email} className='mf-field' type="email" required />
+    <AuthShell eyebrow='MEDFLOW AI account' title='Welcome Back' description='Sign in to access your pet care dashboard, medical records, and veterinary appointments.'>
+      <form onSubmit={onSubmitHandler} className='space-y-5'>
+        <div>
+          <label className='flex items-center gap-2 text-sm font-semibold text-ink'>
+            <Mail className='h-4 w-4 text-muted' />
+            Email
+          </label>
+          <input
+            onChange={(e) => setEmail(e.target.value)}
+            value={email}
+            className='mf-field mt-1.5'
+            type='email'
+            required
+            autoComplete='email'
+            placeholder='you@example.com'
+          />
         </div>
-        <div className='w-full '>
-          <p className='mf-label'>Password</p>
-          <input onChange={(e) => setPassword(e.target.value)} value={password} className='mf-field' type="password" required />
+
+        <div>
+          <label className='flex items-center gap-2 text-sm font-semibold text-ink'>
+            <Lock className='h-4 w-4 text-muted' />
+            Password
+          </label>
+          <div className='relative mt-1.5'>
+            <input
+              onChange={(e) => setPassword(e.target.value)}
+              value={password}
+              className='mf-field pr-12'
+              type={showPassword ? 'text' : 'password'}
+              required
+              autoComplete='current-password'
+              placeholder='Enter your password'
+            />
+            <button
+              type='button'
+              onClick={() => setShowPassword(!showPassword)}
+              className='absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-1.5 text-muted transition-all hover:bg-primary/5 hover:text-ink'
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+            </button>
+          </div>
         </div>
-        {state === 'Sign Up'
-          ? <div className='w-full '>
-            <p className='mf-label'>Confirm password</p>
-            <input onChange={(e) => setConfirmPassword(e.target.value)} value={confirmPassword} className='mf-field' type="password" required />
-          </div>
-          : null
-        }
-        <button disabled={loading} className='mf-button w-full text-base'>{loading ? 'Please wait...' : state === 'Sign Up' ? 'Create account' : 'Sign in'}</button>
-        {state === 'Sign Up'
-          ? <p>Already have an account? <span onClick={() => setState('Login')} className='font-semibold text-primary underline cursor-pointer'>Login here</span></p>
-          : <div className='space-y-2'>
-            <p>Create a new account? <span onClick={() => setState('Sign Up')} className='font-semibold text-primary underline cursor-pointer'>Click here</span></p>
-            <p><span onClick={() => navigate('/forgot-password')} className='text-primary underline cursor-pointer'>Forgot password?</span></p>
-          </div>
-        }
-    </form>
+
+        <div className='flex items-center justify-between gap-4'>
+          <label className='flex items-center gap-2 text-sm font-medium text-muted'>
+            <input type='checkbox' className='h-4 w-4 rounded border-line text-primary focus:ring-primary' />
+            Remember me
+          </label>
+          <button
+            type='button'
+            onClick={() => navigate('/forgot-password')}
+            className='text-sm font-bold text-primary transition-colors hover:text-primary-dark'
+          >
+            Forgot Password
+          </button>
+        </div>
+
+        <button disabled={loading} className='mf-button w-full py-4 text-base'>
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+
+        <div className='relative my-5 text-center'>
+          <div className='absolute inset-0 flex items-center'><div className='w-full border-t border-line'></div></div>
+          <span className='relative inline-block bg-white/70 px-4 text-xs font-semibold text-muted'>Or continue with</span>
+        </div>
+
+        <div className='grid gap-3 sm:grid-cols-2'>
+          <button type='button' className='mf-button-secondary flex w-full items-center justify-center gap-2 py-3'>
+            <Globe2 className='h-5 w-5' />
+            Google Sign In
+          </button>
+          <button type='button' className='mf-button-secondary flex w-full items-center justify-center gap-2 py-3'>
+            <Apple className='h-5 w-5' />
+            Apple Sign In
+          </button>
+        </div>
+
+        <p className='text-center text-sm text-muted'>
+          Don&apos;t have an account?{' '}
+          <button
+            type='button'
+            onClick={() => navigate('/register')}
+            className='font-bold text-primary transition-colors hover:text-primary-dark'
+          >
+            Create your account
+          </button>
+        </p>
+      </form>
     </AuthShell>
   )
 }

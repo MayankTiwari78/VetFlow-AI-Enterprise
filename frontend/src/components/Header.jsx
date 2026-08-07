@@ -1,41 +1,141 @@
 import React from 'react'
+import { motion } from 'framer-motion'
 import { assets } from '../assets/assets'
+import { ArrowRight, Sparkles, ShieldCheck, CalendarCheck, Stethoscope, HeartPulse, Syringe, FileText } from 'lucide-react'
+import { Link } from '../lib/routerCompat'
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 22 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.1, duration: 0.72, ease: [0.21, 0.47, 0.32, 0.98] }
+  })
+}
+
+const floatingCards = [
+  { className: 'left-2 top-16 sm:-left-4 lg:-left-8', icon: HeartPulse, label: 'Health Score', value: '92 /100', tone: 'bg-primary/10 text-primary', delay: 0, distance: -12 },
+  { className: 'right-1 top-40 sm:-right-2 lg:-right-6', icon: Syringe, label: 'Vaccination Reminder', value: 'Booster due in 5 days', tone: 'bg-accent/10 text-primary', delay: 1, distance: -10 },
+  { className: 'left-1 bottom-32 sm:-left-2 lg:-left-10', icon: FileText, label: 'Medical Records', value: '12 records synced', tone: 'bg-secondary/10 text-secondary', delay: 0.5, distance: -8 },
+  { className: 'right-1 bottom-10 sm:-right-2 lg:-right-8', icon: CalendarCheck, label: 'Appointments', value: 'Tue, 10:30 AM', tone: 'bg-primary/10 text-primary', delay: 2, distance: -12 },
+]
 
 const Header = () => {
-    return (
-        <section className='relative grid min-h-[560px] overflow-hidden rounded-lg border border-[#B9DDE0] bg-[#E9F6F6] lg:grid-cols-[1.05fr_.95fr]'>
+  return (
+    <section id='home' className='relative isolate overflow-hidden rounded-[36px] border border-white/70 bg-white/50 shadow-soft-xl'>
+      <div className='mf-soft-grid absolute inset-0 -z-10 opacity-80' />
+      <div className='absolute inset-0 -z-10 bg-[linear-gradient(125deg,rgba(15,157,138,0.12),rgba(255,255,255,0.78)_38%,rgba(56,217,169,0.16))]' />
 
-            {/* --------- Header Left --------- */}
-            <div className='relative z-10 flex flex-col items-start justify-center gap-6 px-6 py-12 sm:px-10 lg:px-14 lg:py-16'>
-                <p className='mf-eyebrow'>VetFlow AI veterinary care</p>
-                <h1 className='text-4xl md:text-5xl lg:text-6xl text-ink font-semibold leading-tight'>
-                    Better Care for Every <span className='text-primary'>Pet</span>
-                </h1>
-                <p className='max-w-xl text-base leading-7 text-slate-600 sm:text-lg'>Manage pets, vaccinations, appointments, AI health insights and trusted veterinarians from one modern platform.</p>
-                <div className='flex flex-col md:flex-row items-center gap-3 text-slate-600 text-sm'>
-                    <div className='flex -space-x-2 text-2xl' aria-hidden='true'><span>🐶</span><span>🐱</span><span>🐰</span></div>
-                    <p><strong className='text-ink'>Made for pet families</strong><br />Organized records and trusted veterinary access.</p>
+      <div className='grid min-h-[calc(100vh-7rem)] items-center gap-12 px-5 py-12 sm:px-8 lg:grid-cols-[1.04fr_0.96fr] lg:px-10 lg:py-16 xl:px-14'>
+        <div className='max-w-2xl'>
+          <motion.div variants={fadeUp} initial='hidden' animate='visible' custom={0}>
+            <span className='inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white/80 px-4 py-2 text-xs font-bold text-primary shadow-soft backdrop-blur-xl'>
+              <Sparkles className='h-4 w-4' />
+              AI Powered Veterinary Healthcare Platform
+            </span>
+          </motion.div>
+
+          <motion.h1 variants={fadeUp} initial='hidden' animate='visible' custom={1} className='mt-6 text-5xl font-black leading-[1.04] text-ink sm:text-6xl lg:text-7xl'>
+            Premium Veterinary Care <span className='gradient-text'>Powered by AI</span>
+          </motion.h1>
+
+          <motion.p variants={fadeUp} initial='hidden' animate='visible' custom={2} className='mt-6 max-w-xl text-lg leading-8 text-muted'>
+            Manage pets, vaccinations, appointments, AI health insights and trusted veterinarians from one connected platform designed for modern pet families.
+          </motion.p>
+
+          <motion.div variants={fadeUp} initial='hidden' animate='visible' custom={3} className='mt-10 flex flex-wrap gap-4'>
+            <Link to='/doctors' className='mf-button group px-8 py-4 text-base'>
+              Book Appointment
+              <ArrowRight className='ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1' />
+            </Link>
+            <Link to='/#features' className='mf-button-secondary px-8 py-4 text-base'>
+              Explore Platform
+            </Link>
+          </motion.div>
+
+          <motion.div variants={fadeUp} initial='hidden' animate='visible' custom={4} className='mt-10 flex items-center gap-6'>
+            <div className='flex -space-x-3'>
+              {['M', 'L', 'B'].map((initial, i) => (
+                <div key={initial} className={`grid h-10 w-10 place-items-center rounded-full ${['bg-primary', 'bg-secondary', 'bg-accent'][i]} text-sm font-bold text-white ring-4 ring-background`}>
+                  {initial}
                 </div>
-                <div className='flex flex-wrap gap-3'>
-                    <a href='/pet-owner/pets/register' className='mf-button'>Register Pet</a>
-                    <a href='/doctors' className='mf-button-secondary'>Book Appointment</a>
-                </div>
+              ))}
+            </div>
+            <div>
+              <div className='flex items-center gap-1'>{[...Array(5)].map((_, i) => <span key={i} className='h-2 w-2 rounded-full bg-accent' />)}</div>
+              <p className='mt-1 text-sm text-muted'><span className='font-semibold text-ink'>10,000+</span> pet owners trust MEDFLOW AI</p>
+            </div>
+          </motion.div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, ease: [0.21, 0.47, 0.32, 0.98] }}
+          className='relative'
+        >
+          <div className='relative mx-auto max-w-md lg:max-w-none'>
+            <div className='relative overflow-hidden rounded-[2.5rem] border border-white/70 bg-white/80 p-3 shadow-soft-xl backdrop-blur-xl'>
+              <img
+                src={assets.veterinary_hero}
+                alt='Veterinarian caring for a pet'
+                className='h-[420px] w-full rounded-[2rem] object-cover lg:h-[500px]'
+              />
+              <div className='absolute bottom-3 left-3 right-3 rounded-b-[2rem] bg-gradient-to-t from-ink/58 to-transparent p-6 pt-24'>
+                <p className='text-lg font-semibold text-white drop-shadow'>Every companion deserves the best care</p>
+                <p className='mt-1 text-sm text-white/80'>24/7 AI monitoring with clinician-ready context</p>
+              </div>
             </div>
 
-            {/* --------- Header Right --------- */}
-            <div className='relative flex min-h-[390px] items-end justify-center overflow-hidden border-t border-[#B9DDE0] bg-[#DDF0F0] px-6 lg:border-l lg:border-t-0'>
-                <div className='absolute left-6 top-7 z-10 rounded-md border border-white/80 bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(21,48,72,0.12)]'>
-                    <p className='text-xs font-bold uppercase tracking-[0.12em] text-teal'>Pet wellness</p>
-                    <p className='mt-1 text-sm font-semibold text-ink'>Care built around every companion</p>
+            {floatingCards.map((card) => (
+              <motion.div
+                key={card.label}
+                className={`absolute ${card.className}`}
+                animate={{ y: [0, card.distance, 0] }}
+                transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: card.delay }}
+              >
+                <div className='glass-card flex max-w-[238px] items-center gap-3 p-4 shadow-soft-xl'>
+                  <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${card.tone}`}>
+                    <card.icon className='h-5 w-5' />
+                  </div>
+                  <div>
+                    <p className='text-xs font-semibold text-muted'>{card.label}</p>
+                    <p className='text-sm font-bold text-ink'>{card.value}</p>
+                  </div>
                 </div>
-                <img className='relative z-0 h-full max-h-[500px] w-full object-contain object-bottom' src={assets.veterinary_hero} alt="Veterinarian caring for a dog" />
-                <div className='absolute bottom-6 right-6 z-10 flex items-center gap-3 rounded-md border border-white/80 bg-ink px-4 py-3 text-white shadow-[0_10px_24px_rgba(21,48,72,0.16)]'>
-                    <span className='h-2.5 w-2.5 rounded-full bg-[#62D8C8]' />
-                    <div><p className='text-xs text-[#BCE9E4]'>Booking status</p><p className='text-sm font-semibold'>Availability updated live</p></div>
+              </motion.div>
+            ))}
+
+            <motion.div
+              className='absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2'
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+            >
+              <div className='glass-card flex items-center gap-3 p-3 shadow-soft-xl'>
+                <div className='grid h-10 w-10 place-items-center rounded-2xl bg-emerald-100/70'>
+                  <ShieldCheck className='h-5 w-5 text-emerald-600' />
                 </div>
-            </div>
-        </section>
-    )
+                <p className='text-sm font-bold text-ink'>650+ Certified Vets</p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className='absolute -bottom-4 left-8'
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+            >
+              <div className='glass-card flex items-center gap-2 p-3 shadow-soft-xl'>
+                <div className='grid h-9 w-9 place-items-center rounded-full bg-primary'>
+                  <Stethoscope className='h-4 w-4 text-white' />
+                </div>
+                <p className='text-sm font-bold text-ink'>Chat with Vet</p>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
 }
 
 export default Header

@@ -30,6 +30,18 @@ import doc12 from './doc12.png'
 import doc13 from './doc13.png'
 import doc14 from './doc14.png'
 import doc15 from './doc15.png'
+import drMeeraRao from './DR.Meera Rao.jpeg'
+import drArjunSen from './DR.Arjun Sen.jpeg'
+import drPriyaNair from './priya Nair.png'
+import drVikramSingh from './DR.Vikram Singh.jpeg'
+import drAnanyaIyer from './DR.Ananya Iyer.jpeg'
+import drRohanGupta from './DR.Rohan Gupta.jpeg'
+import drKavyaMenon from './DR.Kavya Menon.jpeg'
+import drAdityaKumar from './DR. Aditya kumar.jpeg'
+import drDivyaSharma from './DR.Divya Sharma.jpeg'
+import drSnehaPatel from './DR.Sneha Patel.jpeg'
+import drRahulVerma from './DR.Rahul Verma.jpeg'
+import drNikhilJoshi from './DR.Nikhil Joshi.jpeg'
 import veterinaryHero from './veterinary-hero.svg'
 import veterinaryCare from './veterinary-care.svg'
 
@@ -55,6 +67,18 @@ export const assets = {
     razorpay_logo: assetUrl(razorpay_logo)
     ,veterinary_hero: assetUrl(veterinaryHero)
     ,veterinary_care: assetUrl(veterinaryCare)
+    ,dr_meera_rao: assetUrl(drMeeraRao)
+    ,dr_arjun_sen: assetUrl(drArjunSen)
+    ,dr_priya_nair: assetUrl(drPriyaNair)
+    ,dr_vikram_singh: assetUrl(drVikramSingh)
+    ,dr_ananya_iyer: assetUrl(drAnanyaIyer)
+    ,dr_rohan_gupta: assetUrl(drRohanGupta)
+    ,dr_kavya_menon: assetUrl(drKavyaMenon)
+    ,dr_aditya_kumar: assetUrl(drAdityaKumar)
+    ,dr_divya_sharma: assetUrl(drDivyaSharma)
+    ,dr_sneha_patel: assetUrl(drSnehaPatel)
+    ,dr_rahul_verma: assetUrl(drRahulVerma)
+    ,dr_nikhil_joshi: assetUrl(drNikhilJoshi)
 }
 
 export const specialityData = [

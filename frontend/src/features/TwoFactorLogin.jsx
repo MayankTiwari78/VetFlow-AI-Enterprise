@@ -6,6 +6,7 @@ import { AppContext } from '../context/AppContext'
 import AuthShell from '../components/AuthShell'
 import { resetSessionExpiredNotification } from '../api/authClient'
 import { safeLoginDestination } from '../lib/authNavigation'
+import { KeyRound, Eye, EyeOff } from 'lucide-react'
 
 const TwoFactorLogin = () => {
   const navigate = useNavigate()
@@ -53,19 +54,37 @@ const TwoFactorLogin = () => {
 
   return (
     <AuthShell eyebrow='Protected sign in' title='Two-factor verification' description='Use your authenticator app or one unused recovery code to complete this sign-in.'>
-    <form onSubmit={onSubmit} className='space-y-4 text-sm text-slate-600'>
-        <div className='w-full'>
-          <p className='mf-label'>Authenticator code</p>
-          <input value={totpCode} onChange={(e) => setTotpCode(e.target.value)} className='mf-field' inputMode='numeric' maxLength='6' />
+      <form onSubmit={onSubmit} className='space-y-4 text-sm text-slate-600'>
+        <div>
+          <label className='flex items-center gap-2 text-sm font-semibold text-ink'>
+            <KeyRound className='h-4 w-4 text-muted' />
+            Authenticator code
+          </label>
+          <input
+            value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value)}
+            className='mf-field mt-1.5 text-center tracking-[0.2em]'
+            inputMode='numeric'
+            maxLength='6'
+            placeholder='———'
+          />
         </div>
-        <div className='w-full'>
-          <p className='mf-label'>Recovery code</p>
-          <input value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value)} className='mf-field' />
+        <div>
+          <label className='flex items-center gap-2 text-sm font-semibold text-ink'>
+            <KeyRound className='h-4 w-4 text-muted' />
+            Recovery code
+          </label>
+          <input
+            value={recoveryCode}
+            onChange={(e) => setRecoveryCode(e.target.value)}
+            className='mf-field mt-1.5'
+            placeholder='Enter a recovery code'
+          />
         </div>
-        <button disabled={loading || (!totpCode && !recoveryCode)} className='mf-button w-full my-1 text-base'>
+        <button disabled={loading || (!totpCode && !recoveryCode)} className='mf-button w-full my-1 text-base py-4'>
           {loading ? 'Verifying...' : 'Verify'}
         </button>
-    </form>
+      </form>
     </AuthShell>
   )
 }
