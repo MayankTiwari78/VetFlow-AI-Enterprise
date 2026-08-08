@@ -6,7 +6,9 @@ import { AppContext } from '../../context/AppContext'
 import { isAuthSessionHandledError } from '../../api/authClient'
 import { useProtectedPatientRoute } from '../../hooks/useProtectedPatientRoute'
 import { useNavigate, useParams } from '../../lib/routerCompat'
-import { cleanVetName } from '../../lib/veterinaryDisplay'
+import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
+import AppointmentsView from './AppointmentsView'
+import MedicalHistoryPage from './MedicalHistoryPage'
 
 const petDraft = {
   name: '',
@@ -33,7 +35,7 @@ const ownerDraft = {
 
 const pageTitles = {
   dashboard: ['Veterinary care', 'Pet owner dashboard', 'Manage pets, preliminary AI reports, vaccinations, visits, and upcoming appointments.'],
-  pets: ['Pet management', 'My pets', 'Register, update, delete, and review every pet profile connected to your account.'],
+  pets: ['My Pets', 'My Pets', 'Manage your pets\' profiles and health records'],
   register: ['Pet management', 'Register pet', 'Add a new pet profile for your veterinary clinic records.'],
   'pet-details': ['Pet profile', 'Pet details', 'Review identity, health, vaccination, medical history, and AI preliminary assessment data.'],
   medical: ['Pet medical records', 'Medical history', 'A complete timeline of pet medical records shared by veterinary care teams.'],
@@ -52,6 +54,146 @@ const formatDate = (value) => {
   if (!value) return 'Not scheduled'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const PetImage = ({ src, alt, className, fallbackClassName, size = 'md' }) => {
+  const [imgError, setImgError] = useState(false)
+  const initial = String(alt || 'P').charAt(0).toUpperCase()
+  const sizeClasses = {
+    sm: 'h-10 w-10 text-base',
+    md: 'h-12 w-12 text-lg',
+    lg: 'h-14 w-14 text-xl',
+    xl: 'h-24 w-24 text-3xl'
+  }
+  const baseClass = `${sizeClasses[size] || sizeClasses.md} shrink-0 rounded-full object-cover`
+  if (src && !imgError) {
+    return <img src={src} alt={alt} onError={() => setImgError(true)} className={`${baseClass} ${className || ''}`} />
+  }
+  return (
+    <div className={`${baseClass} ${fallbackClassName || 'bg-teal/10 text-teal'} grid place-items-center font-bold`} >
+      {initial}
+    </div>
+  )
+}
+
+const StatusBadge = ({ status }) => {
+  const normalized = String(status || '').toLowerCase()
+  const isHealthy = normalized === 'up-to-date' || normalized === 'healthy' || normalized === 'good'
+  const isAttention = normalized === 'needs attention' || normalized === 'overdue' || normalized === 'due' || normalized === 'attention'
+  if (isAttention) {
+    return (
+      <span className='inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800'>
+        Needs Attention
+      </span>
+    )
+  }
+  if (isHealthy) {
+    return (
+      <span className='inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700'>
+        Healthy
+      </span>
+    )
+  }
+  return (
+    <span className='inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600'>
+      {String(status || 'Unknown')}
+    </span>
+  )
+}
+
+const PetSelectorCard = ({ pet, isSelected, onSelect, onEdit, onDelete }) => (
+  <button
+    type="button"
+    onClick={onSelect}
+    className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200 ${
+      isSelected
+        ? 'border-teal bg-teal/5'
+        : 'border-line/70 bg-white hover:border-teal/30 hover:bg-mist'
+    }`}
+  >
+    <PetImage src={pet.profileImage} alt={pet.name} size="lg" fallbackClassName="bg-teal/10 text-teal" />
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-bold text-ink">{pet.name}</p>
+      <p className="truncate text-xs text-muted">{pet.breed || pet.species || 'Breed not set'}</p>
+    </div>
+    <StatusBadge status={pet.vaccinationStatus} />
+  </button>
+)
+
+const PetProfileView = ({ pet, activeTab, setActiveTab, records, vaccinations, reports, onEdit, onDelete }) => {
+  const healthStatus = pet.vaccinationStatus || 'unknown'
+  const isHealthy = healthStatus === 'up-to-date' || healthStatus === 'healthy' || healthStatus === 'good'
+  const statusLabel = isHealthy ? 'Healthy' : 'Needs Attention'
+  const statusColor = isHealthy ? 'text-emerald-600' : 'text-amber-600'
+  const ageValue = pet.age ? `${pet.age} ${Number(pet.age) === 1 ? 'year' : 'years'}` : 'Not recorded'
+  const weightValue = pet.weight ? `${pet.weight} kg` : 'Not recorded'
+  const breedValue = pet.breed || 'Not recorded'
+  const speciesValue = pet.species || 'Not recorded'
+  const dobValue = pet.dateOfBirth ? formatDate(pet.dateOfBirth) : 'Not recorded'
+  const genderValue = pet.gender || 'Not recorded'
+  const microchipValue = pet.microchipNumber || 'Not recorded'
+  const primaryVetValue = pet.primaryVet || 'Not assigned'
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'vaccinations', label: 'Vaccinations' },
+    { id: 'history', label: 'Health History' }
+  ]
+  return (
+    <article className='mf-card overflow-hidden'>
+      <div className='relative h-32 w-full rounded-t-2xl bg-gradient-to-r from-teal to-emerald-600' />
+      <div className='relative flex flex-col items-center px-6 pb-6'>
+        <div className='-mt-12 mb-4 grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white bg-[#E7F4F5] text-3xl font-bold text-teal'>
+          <PetImage src={pet.profileImage} alt={pet.name} size='xl' fallbackClassName='bg-teal/10 text-teal' />
+        </div>
+        <h2 className='text-2xl font-bold text-ink'>{pet.name}</h2>
+        <p className={`mt-1 text-sm font-semibold ${statusColor}`}>{statusLabel}</p>
+        <p className='mt-1 text-sm text-muted'>{breedValue} · {speciesValue}</p>
+      </div>
+      <div className='border-t border-line px-6 py-5'>
+        <dl className='grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4'>
+          <div><dt className='text-slate-500'>Date of Birth</dt><dd className='mt-1 font-semibold text-ink'>{dobValue}</dd></div>
+          <div><dt className='text-slate-500'>Age</dt><dd className='mt-1 font-semibold text-ink'>{ageValue}</dd></div>
+          <div><dt className='text-slate-500'>Weight</dt><dd className='mt-1 font-semibold text-ink'>{weightValue}</dd></div>
+          <div><dt className='text-slate-500'>Gender</dt><dd className='mt-1 font-semibold text-ink'>{genderValue}</dd></div>
+          <div><dt className='text-slate-500'>Primary Vet</dt><dd className='mt-1 font-semibold text-ink'>{primaryVetValue}</dd></div>
+          <div><dt className='text-slate-500'>Microchip</dt><dd className='mt-1 font-semibold text-ink'>{microchipValue}</dd></div>
+        </dl>
+      </div>
+      <div className='border-t border-line px-6 py-4'>
+        <div className='flex flex-wrap gap-2'>
+          {tabs.map((tab) => (
+            <button key={tab.id} type='button' onClick={() => setActiveTab(tab.id)} className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${activeTab === tab.id ? 'bg-teal/10 text-teal' : 'text-muted hover:bg-mist hover:text-ink'}`}>{tab.label}</button>
+          ))}
+        </div>
+      </div>
+      <div className='px-6 pb-6'>
+        {activeTab === 'overview' && (
+          <div className='grid gap-6 text-sm md:grid-cols-2'>
+            <div className='rounded-xl border border-line/70 bg-[#F6F9F9] p-4'>
+              <p className='font-semibold text-slate-700'>Health Summary</p>
+              <p className='mt-2 text-slate-600'>{pet.medicalHistory && pet.medicalHistory.length ? listText(pet.medicalHistory) : 'No health summary available.'}</p>
+            </div>
+            <div className='rounded-xl border border-line/70 bg-[#F6F9F9] p-4'>
+              <p className='font-semibold text-slate-700'>Vaccination Status</p>
+              <p className='mt-2 text-slate-600'>{pet.vaccinationStatus ? `Vaccination status: ${pet.vaccinationStatus}` : 'Vaccination status not recorded.'}</p>
+            </div>
+          </div>
+        )}
+        {activeTab === 'vaccinations' && (
+          <DataTable columns={[{ key: 'vaccineName', label: 'Vaccine' }, { key: 'dueDate', label: 'Due date', render: (item) => formatDate(item.dueDate) }, { key: 'completedDate', label: 'Completed', render: (item) => formatDate(item.completedDate) }, { key: 'nextDose', label: 'Next dose', render: (item) => formatDate(item.nextDose) }, { key: 'notes', label: 'Notes' }]} rows={vaccinations} emptyTitle='No vaccination history found.' />
+        )}
+        {activeTab === 'history' && (
+          <DataTable columns={[{ key: 'visitDate', label: 'Visit date', render: (record) => formatDate(record.visitDate) }, { key: 'diagnosis', label: 'Diagnosis' }, { key: 'symptoms', label: 'Symptoms', render: (record) => listText(record.symptoms) || 'Not recorded' }, { key: 'treatment', label: 'Treatment' }, { key: 'followUpDate', label: 'Follow-up', render: (record) => formatDate(record.followUpDate) }]} rows={records} emptyTitle='No medical records found.' />
+        )}
+      </div>
+      <div className='border-t border-line px-6 py-4'>
+        <div className='flex flex-wrap gap-3'>
+          <button type='button' className='mf-button-secondary' onClick={onEdit}>Edit pet</button>
+          <button type='button' className='rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50' onClick={onDelete}>Delete pet</button>
+        </div>
+      </div>
+    </article>
+  )
 }
 
 const petToDraft = (pet) => ({
@@ -172,7 +314,7 @@ const PetSummaryCard = ({ pet, onOpen }) => (
   <article className='mf-card overflow-hidden'>
     <div className='flex gap-4 p-5'>
       <div className='h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[#E7F4F5]'>
-        {pet.profileImage ? <img className='h-full w-full object-cover' src={pet.profileImage} alt={pet.name} /> : <div className='grid h-full place-items-center text-2xl font-semibold text-primary'>{String(pet.name || 'P').slice(0, 1)}</div>}
+        <PetImage src={pet.profileImage} alt={pet.name} size='xl' fallbackClassName='bg-teal/10 text-teal' />
       </div>
       <div className='min-w-0 flex-1'>
         <p className='truncate text-lg font-semibold text-ink'>{pet.name}</p>
@@ -188,8 +330,8 @@ const PetSummaryCard = ({ pet, onOpen }) => (
 
 const DataTable = ({ columns, rows, emptyTitle, renderActions }) => (
   <div className='mf-card overflow-hidden'>
-    <div className='overflow-x-auto'>
-      <table className='w-full min-w-[760px] text-left text-sm'>
+     <div className='w-full min-w-0 overflow-x-auto'>
+       <table className='w-full min-w-[600px] text-left text-sm'>
         <thead className='bg-[#E7F4F5] text-xs uppercase text-slate-600'>
           <tr>{columns.map((column) => <th key={column.key} className='px-4 py-3 font-semibold'>{column.label}</th>)}{renderActions && <th className='px-4 py-3 font-semibold'>Actions</th>}</tr>
         </thead>
@@ -208,17 +350,17 @@ const DataTable = ({ columns, rows, emptyTitle, renderActions }) => (
 )
 
 const Filters = ({ filters, setFilters, onSearch }) => (
-  <form className='mf-card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-6' onSubmit={onSearch}>
-    <input className='mf-field mt-0 lg:col-span-2' placeholder='Search by name, breed, species' value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} />
+  <form className='mf-card grid w-full min-w-0 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4' onSubmit={onSearch}>
+    <input className='mf-field mt-0 sm:col-span-2' placeholder='Search by name, breed, species' value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} />
     <input className='mf-field mt-0' placeholder='Species' value={filters.species} onChange={(event) => setFilters({ ...filters, species: event.target.value })} />
     <input className='mf-field mt-0' placeholder='Breed' value={filters.breed} onChange={(event) => setFilters({ ...filters, breed: event.target.value })} />
     <select className='mf-field mt-0' value={filters.gender} onChange={(event) => setFilters({ ...filters, gender: event.target.value })}><option value=''>Gender</option><option>Female</option><option>Male</option><option>Spayed Female</option><option>Neutered Male</option></select>
-    <button className='mf-button' type='submit'>Search pets</button>
     <input className='mf-field mt-0' min='0' type='number' placeholder='Min age' value={filters.minAge} onChange={(event) => setFilters({ ...filters, minAge: event.target.value })} />
     <input className='mf-field mt-0' min='0' type='number' placeholder='Max age' value={filters.maxAge} onChange={(event) => setFilters({ ...filters, maxAge: event.target.value })} />
     <input className='mf-field mt-0' min='0' type='number' placeholder='Min weight' value={filters.minWeight} onChange={(event) => setFilters({ ...filters, minWeight: event.target.value })} />
     <input className='mf-field mt-0' min='0' type='number' placeholder='Max weight' value={filters.maxWeight} onChange={(event) => setFilters({ ...filters, maxWeight: event.target.value })} />
-    <select className='mf-field mt-0 lg:col-span-2' value={filters.vaccinationStatus} onChange={(event) => setFilters({ ...filters, vaccinationStatus: event.target.value })}><option value=''>Vaccination status</option><option value='up-to-date'>Up to date</option><option value='due'>Due</option><option value='overdue'>Overdue</option><option value='partial'>Partial</option><option value='unknown'>Unknown</option></select>
+    <select className='mf-field mt-0 sm:col-span-2' value={filters.vaccinationStatus} onChange={(event) => setFilters({ ...filters, vaccinationStatus: event.target.value })}><option value=''>Vaccination status</option><option value='up-to-date'>Up to date</option><option value='due'>Due</option><option value='overdue'>Overdue</option><option value='partial'>Partial</option><option value='unknown'>Unknown</option></select>
+    <button className='mf-button mt-0 sm:col-span-2 lg:col-span-4' type='submit'>Search pets</button>
   </form>
 )
 
@@ -260,6 +402,8 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [draft, setDraft] = useState(petDraft)
   const [ownerForm, setOwnerForm] = useState(ownerDraft)
   const [filters, setFilters] = useState({ search: '', species: '', breed: '', gender: '', minAge: '', maxAge: '', minWeight: '', maxWeight: '', vaccinationStatus: '' })
+  const [selectedPetInList, setSelectedPetInList] = useState(null)
+  const [activeTab, setActiveTab] = useState('overview')
 
   const selectedPetId = params.petId || ''
   const title = pageTitles[view] || pageTitles.dashboard
@@ -319,7 +463,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       }
       if (view === 'appointments') {
         const { data } = await axios.get(`${backendUrl}/api/user/appointments`, { headers: { token } })
-        setAppointments(asArray(data.appointments).filter((item) => !item.cancelled && !item.isCompleted))
+        setAppointments(asArray(data.appointments))
       }
       if (view === 'profile') {
         try {
@@ -350,6 +494,12 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   useEffect(() => {
     void loadAll()
   }, [token, selectedPetId, view])
+
+  useEffect(() => {
+    if (view === 'pets' && pets.length && !selectedPetInList) {
+      setSelectedPetInList(pets[0])
+    }
+  }, [view, pets, selectedPetInList])
 
   const submitSearch = async (event) => {
     event.preventDefault()
@@ -464,18 +614,26 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   ]
 
   return (
-    <main className='py-10'>
-      <section className='mb-7 flex flex-col justify-between gap-5 border-b border-line pb-7 lg:flex-row lg:items-end'>
-        <div>
-          <p className='mf-eyebrow'>{title[0]}</p>
-          <h1 className='mf-title'>{title[1]}</h1>
-          <p className='mf-copy'>{title[2]}</p>
-        </div>
-        <div className='flex flex-wrap gap-2'>
-          <button className='mf-button-secondary' onClick={() => navigate('/pet-owner/pets')}>My pets</button>
-          <button className='mf-button' onClick={() => { setDraft(petDraft); setFormError(''); view === 'register' ? setModal('register') : navigate('/pet-owner/pets/register') }}>Register pet</button>
-        </div>
-      </section>
+    <section className='w-full min-w-0 py-10'>
+      {view !== 'medical' && (
+        <section className='mb-7 flex flex-col justify-between gap-5 border-b border-line pb-7 lg:flex-row lg:items-end'>
+          <div>
+            <p className='mf-eyebrow'>{title[0]}</p>
+            <h1 className='mf-title'>{title[1]}</h1>
+            <p className='mf-copy'>{title[2]}</p>
+          </div>
+          <div className='flex flex-wrap gap-2'>
+            {view === 'pets' ? (
+              <button className='mf-button' onClick={() => { setDraft(petDraft); setFormError(''); setModal('register') }}>+ Add Pet</button>
+            ) : (
+              <>
+                <button className='mf-button-secondary' onClick={() => navigate('/pet-owner/pets')}>My pets</button>
+                <button className='mf-button' onClick={() => { setDraft(petDraft); setFormError(''); view === 'register' ? setModal('register') : navigate('/pet-owner/pets/register') }}>Register pet</button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {view === 'dashboard' && (
         <div className='space-y-6'>
@@ -499,16 +657,40 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {view === 'register' && <div className='mf-card p-6'><PetForm draft={draft} setDraft={setDraft} onSubmit={savePet} saving={saving} submitLabel='Register pet' error={formError} onCancel={() => navigate('/pet-owner/pets')} /></div>}
 
       {view === 'pets' && (
-        <div className='space-y-5'>
-          <Filters filters={filters} setFilters={setFilters} onSearch={submitSearch} />
-          <DataTable columns={petColumns} rows={filteredPets} emptyTitle='No pets match the current search and filters.' renderActions={(pet) => <div className='flex gap-3'><button className='font-semibold text-primary' onClick={() => navigate(`/pet-owner/pets/${getId(pet)}`)}>View</button><button className='font-semibold text-primary' onClick={() => openEdit(pet)}>Edit</button></div>} />
+        <div className='space-y-6'>
+          <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+            {pets.map((pet) => (
+              <PetSelectorCard
+                key={getId(pet)}
+                pet={pet}
+                isSelected={selectedPetInList && getId(selectedPetInList) === getId(pet)}
+                onSelect={() => setSelectedPetInList(pet)}
+                onEdit={() => openEdit(pet)}
+                onDelete={() => { setSelectedPet(pet); setFormError(''); setModal('delete') }}
+              />
+            ))}
+          </div>
+          {pets.length === 0 && <EmptyState title='No pets registered' body='Register your first pet to unlock veterinary records, vaccination history, and AI reports.' actionLabel='Add Pet' onAction={() => { setDraft(petDraft); setFormError(''); setModal('register') }} />}
+
+          {selectedPetInList && (
+            <PetProfileView
+              pet={selectedPetInList}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              records={records}
+              vaccinations={vaccinations}
+              reports={reports}
+              onEdit={() => openEdit(selectedPetInList)}
+              onDelete={() => { setSelectedPet(selectedPetInList); setFormError(''); setModal('delete') }}
+            />
+          )}
         </div>
       )}
 
       {view === 'pet-details' && selectedPet && (
         <div className='space-y-6'>
           <section className='mf-card grid gap-6 p-6 lg:grid-cols-[220px_1fr]'>
-            <div className='aspect-square overflow-hidden rounded-lg bg-[#E7F4F5]'>{selectedPet.profileImage ? <img className='h-full w-full object-cover' src={selectedPet.profileImage} alt={selectedPet.name} /> : <div className='grid h-full place-items-center text-5xl font-semibold text-primary'>{String(selectedPet.name || 'P').slice(0, 1)}</div>}</div>
+            <div className='aspect-square w-full max-w-[220px] overflow-hidden rounded-lg bg-[#E7F4F5]'><PetImage src={selectedPet.profileImage} alt={selectedPet.name} size='xl' fallbackClassName='bg-teal/10 text-teal' /></div>
             <div>
               <div className='flex flex-wrap items-start justify-between gap-4'>
                 <div><p className='mf-eyebrow'>Pet profile</p><h2 className='mt-2 text-3xl font-semibold text-ink'>{selectedPet.name}</h2><p className='mt-2 text-slate-600'>{selectedPet.species} {selectedPet.breed ? `- ${selectedPet.breed}` : ''}</p></div>
@@ -529,10 +711,18 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
         </div>
       )}
 
-      {view === 'medical' && <DataTable columns={recordColumns} rows={records} emptyTitle='No pet medical records found.' />}
+      {view === 'medical' && (
+        <MedicalHistoryPage
+          pets={pets}
+          records={records}
+          onMyPets={() => navigate('/pet-owner/pets')}
+          onBrowseVets={() => navigate('/doctors')}
+          onRegisterPet={() => navigate('/pet-owner/pets/register')}
+        />
+      )}
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
       {view === 'ai' && <div className='space-y-4'>{reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}{reports.length === 0 && <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />}</div>}
-      {view === 'appointments' && <DataTable columns={[{ key: 'docData', label: 'Veterinarian', render: (item) => cleanVetName(item.docData?.name) || 'Veterinarian' }, { key: 'slotDate', label: 'Date', render: (item) => formatDate(item.slotDate) }, { key: 'slotTime', label: 'Time' }, { key: 'payment', label: 'Payment', render: (item) => item.payment ? 'Paid' : 'Pending' }]} rows={appointments} emptyTitle='No upcoming appointments found.' />}
+      {view === 'appointments' && <AppointmentsView appointments={appointments} pets={pets} onRefresh={loadAll} />}
       {view === 'profile' && (
         <form className='mf-card grid gap-4 p-6 sm:grid-cols-2' onSubmit={saveOwner}>
           {formError && <div role='alert' className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2'>{formError}</div>}
@@ -548,7 +738,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {modal === 'register' && <Modal title='Register pet' onClose={() => setModal('')}><PetForm draft={draft} setDraft={setDraft} onSubmit={savePet} saving={saving} submitLabel='Register pet' error={formError} /></Modal>}
       {modal === 'edit' && <Modal title='Edit pet' onClose={() => setModal('')}><PetForm draft={draft} setDraft={setDraft} onSubmit={savePet} saving={saving} submitLabel='Update pet' error={formError} /></Modal>}
       {modal === 'delete' && selectedPet && <Modal title='Delete confirmation' onClose={() => setModal('')}><div className='space-y-4'><p className='text-sm leading-6 text-slate-600'>Delete {selectedPet.name}? This removes the pet profile and connected veterinary records from the veterinary database.</p>{formError && <p className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{formError}</p>}<div className='flex gap-3'><button type='button' disabled={saving} className='rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60' onClick={deletePet}>{saving ? 'Deleting...' : 'Delete pet'}</button><button type='button' className='mf-button-secondary' onClick={() => setModal('')}>Cancel</button></div></div></Modal>}
-    </main>
+    </section>
   )
 }
 

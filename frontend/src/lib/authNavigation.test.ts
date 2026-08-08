@@ -26,17 +26,17 @@ describe("auth navigation helpers", () => {
       "",
       null
     ]) {
-      expect(normalizeReturnTo(value)).toBe("/");
+      expect(normalizeReturnTo(value)).toBe("/dashboard");
     }
 
-    expect(safeLoginDestination("/login?returnTo=%2Fsecurity")).toBe("/");
+    expect(safeLoginDestination("/login?returnTo=%2Fsecurity")).toBe("/dashboard");
   });
 
   it("builds encoded login links for protected redirects", () => {
     expect(loginHrefForReturnTo("/my-profile?tab=account")).toBe(
       "/login?returnTo=%2Fmy-profile%3Ftab%3Daccount"
     );
-    expect(loginHrefForReturnTo("https://example.test")).toBe("/login?returnTo=%2F");
+    expect(loginHrefForReturnTo("https://example.test")).toBe("/login?returnTo=%2Fdashboard");
   });
 
   it("preserves current internal path and query string", () => {

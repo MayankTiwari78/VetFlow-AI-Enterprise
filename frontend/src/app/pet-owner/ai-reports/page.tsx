@@ -1,7 +1,12 @@
 "use client";
 
+import DashboardLayout from "../../../features/Veterinary/DashboardLayout";
 import PetOwnerDashboard from "../../../features/Veterinary/PetOwnerDashboard";
 
 export default function PetAiReportsPage() {
-  return <PetOwnerDashboard view="ai" />;
+  return (
+    <DashboardLayout>
+      <PetOwnerDashboard view="ai" />
+    </DashboardLayout>
+  );
 }

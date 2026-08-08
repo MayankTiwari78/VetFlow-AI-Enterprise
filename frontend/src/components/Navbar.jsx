@@ -33,13 +33,15 @@ const Navbar = () => {
     { to: '/contact', label: 'Contact' },
   ]
 
+  const visibleNavLinks = token ? navLinks.filter((link) => link.to === '/doctors') : navLinks
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'glass shadow-soft-lg' : 'bg-white/50 backdrop-blur-xl'}`}>
       <div className='mf-page flex min-h-20 items-center justify-between gap-5 px-0'>
         <BrandLogo onClick={() => navigate('/')} />
         
         <ul className='hidden items-center gap-1 lg:flex'>
-          {navLinks.map((link) => (
+          {visibleNavLinks.map((link) => (
             <NavLink key={link.to} to={link.to}>
               <li className='px-4 py-2 text-sm font-medium text-muted hover:text-primary rounded-xl hover:bg-primary/5 transition-all duration-200'>{link.label}</li>
             </NavLink>
@@ -73,8 +75,8 @@ const Navbar = () => {
                       <button onClick={() => { navigate('/health-profile'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
                         <Heart className='h-4 w-4' /> Health profile
                       </button>
-                      <button onClick={() => { navigate('/pet-owner'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
-                        <LayoutDashboard className='h-4 w-4' /> Pet owner dashboard
+                      <button onClick={() => { navigate('/dashboard'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
+                        <LayoutDashboard className='h-4 w-4' /> Dashboard
                       </button>
                       <button onClick={() => { navigate('/pet-owner/pets'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
                         <PawPrint className='h-4 w-4' /> My pets
@@ -118,7 +120,7 @@ const Navbar = () => {
           </button>
         </div>
         <ul className='flex flex-col gap-1 px-5 mt-5'>
-          {navLinks.map((link) => (
+          {visibleNavLinks.map((link) => (
             <NavLink key={link.to} onClick={() => setShowMenu(false)} to={link.to}>
               <p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>{link.label}</p>
             </NavLink>
@@ -126,7 +128,7 @@ const Navbar = () => {
           <hr className='my-3 border-line/60' />
           {token && (
             <>
-              <NavLink onClick={() => setShowMenu(false)} to='/pet-owner'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Pet Owner Dashboard</p></NavLink>
+              <NavLink onClick={() => setShowMenu(false)} to='/dashboard'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Dashboard</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/pet-owner/pets'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>My Pets</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/health-profile'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Health Profile</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/medical-timeline'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Medical Timeline</p></NavLink>

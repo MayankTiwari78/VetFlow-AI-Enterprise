@@ -15,8 +15,27 @@
   --mf-line: #E2E8F0;
 }
 
-* {
+ *,
+ *::before,
+ *::after {
   box-sizing: border-box;
+}
+
+/* Prevent flex/grid children from forcing overflow */
+.container,
+.flex,
+.grid,
+[class*="flex-"],
+[class*="grid-cols"],
+[class*="flex-"][class*="flex-col"],
+[class*="flex-"][class*="flex-row"] {
+  min-width: 0;
+}
+
+/* Ensure tables never force page width */
+table {
+  max-width: 100%;
+  width: 100%;
 }
 
 html {

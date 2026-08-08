@@ -1,7 +1,10 @@
-"use client";
-
 import Doctors from "../../../features/Doctors";
+import DashboardLayout from "../../../features/Veterinary/DashboardLayout";
 
 export default function DoctorsSpecialityPage() {
-  return <Doctors />;
+  return (
+    <DashboardLayout>
+      <Doctors />
+    </DashboardLayout>
+  );
 }
