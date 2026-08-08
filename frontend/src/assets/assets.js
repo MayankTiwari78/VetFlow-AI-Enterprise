@@ -44,6 +44,8 @@ import drRahulVerma from './DR.Rahul Verma.jpeg'
 import drNikhilJoshi from './DR.Nikhil Joshi.jpeg'
 import veterinaryHero from './veterinary-hero.svg'
 import veterinaryCare from './veterinary-care.svg'
+const loginWoman = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1200&auto=format&fit=crop'
+const heroPet = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=1400&auto=format&fit=crop'
 
 const assetUrl = (asset) => typeof asset === 'string' ? asset : asset?.src
 
@@ -67,6 +69,8 @@ export const assets = {
     razorpay_logo: assetUrl(razorpay_logo)
     ,veterinary_hero: assetUrl(veterinaryHero)
     ,veterinary_care: assetUrl(veterinaryCare)
+    ,login_woman: assetUrl(loginWoman)
+    ,hero_pet: assetUrl(heroPet)
     ,dr_meera_rao: assetUrl(drMeeraRao)
     ,dr_arjun_sen: assetUrl(drArjunSen)
     ,dr_priya_nair: assetUrl(drPriyaNair)
