@@ -6,12 +6,10 @@ import { useNavigate } from '../lib/routerCompat'
 import { motion, AnimatePresence } from 'framer-motion'
 import { assets } from '../assets/assets'
 import BrandLogo from '../components/BrandLogo'
-import { Eye, EyeOff, Mail, Lock, User, PawPrint, Stethoscope, Building2, Check, ArrowRight, Brain, CalendarCheck, FileText, ShieldCheck, Syringe } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, PawPrint, Check, ArrowRight, Brain, CalendarCheck, FileText, ShieldCheck, Syringe } from 'lucide-react'
 
 const roles = [
   { value: 'Pet Owner', label: 'Pet Owner', icon: PawPrint },
-  { value: 'Veterinarian', label: 'Veterinarian', icon: Stethoscope },
-  { value: 'Clinic', label: 'Clinic', icon: Building2 },
 ]
 
 const benefits = [
@@ -32,11 +30,15 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const updateField = (field, value) => setFormData({ ...formData, [field]: value })
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
+    if (!termsAccepted) {
+      return
+    }
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match')
       return
@@ -265,7 +267,7 @@ const Register = () => {
                 >
                   <div>
                     <label className='mb-2 block text-sm font-semibold text-ink'>Role</label>
-                    <div className='grid gap-3 sm:grid-cols-3'>
+                    <div className='grid gap-3'>
                       {roles.map((role) => (
                         <button
                           key={role.value}
@@ -285,7 +287,12 @@ const Register = () => {
                   </div>
 
                   <label className='flex items-start gap-3 rounded-[16px] border border-line/70 bg-white/70 p-3 text-sm leading-6 text-muted'>
-                    <input type='checkbox' className='mt-1 h-4 w-4 rounded border-line text-primary focus:ring-primary' />
+                    <input
+                      type='checkbox'
+                      className='mt-1 h-4 w-4 rounded border-line text-primary focus:ring-primary'
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                    />
                     <span>I agree to the MEDFLOW AI terms and privacy policy.</span>
                   </label>
 
@@ -293,7 +300,11 @@ const Register = () => {
                     <button type='button' onClick={backStep} className='mf-button-secondary flex-1 !py-3 text-sm'>
                       Back
                     </button>
-                    <button type='submit' disabled={loading} className='mf-button flex-1 !py-3 text-sm'>
+                    <button
+                      type='submit'
+                      disabled={loading || !termsAccepted}
+                      className={`mf-button flex-1 !py-3 text-sm ${!termsAccepted ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
                       {loading ? 'Creating account...' : 'Create Account'}
                     </button>
                   </div>

@@ -280,43 +280,6 @@ const DashboardLayout = ({ children }) => {
                 />
               </button>
 
-              {showDropdown && (
-                <div
-                  role="menu"
-                  className="absolute top-full z-50 mt-2 w-56 max-w-[calc(100vw-16px)] rounded-2xl border border-line/70 bg-white p-2 shadow-soft-xl animate-fade-in-down"
-                  style={{ right: `${dropdownShift}px` }}
-                >
-                  <div className="border-b border-line/70 px-3 py-2.5">
-                    <p className="truncate text-sm font-bold text-ink">{firstName}</p>
-                    <p className="truncate text-xs text-muted">{email}</p>
-                  </div>
-                  <div className="mt-1 max-h-[60vh] space-y-0.5 overflow-y-auto">
-                    {dropdownItems.map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        onClick={() => {
-                          setShowDropdown(false);
-                          navigate(item.to);
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-mist hover:text-ink"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    ))}
-                    <hr className="my-1 border-line/70" />
-                    <button
-                      type="button"
-                      onClick={logout}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                    >
-                      <LogOut className="h-4 w-4 shrink-0" />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </header>

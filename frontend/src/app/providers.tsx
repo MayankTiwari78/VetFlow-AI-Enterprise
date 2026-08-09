@@ -11,8 +11,6 @@ import AppContextProvider from "../context/AppContext";
 const isAuthenticatedAppRoute = (pathname: string) =>
   pathname === "/dashboard" ||
   pathname.startsWith("/dashboard/") ||
-  pathname === "/doctors" ||
-  pathname.startsWith("/doctors/") ||
   pathname === "/pet-owner" ||
   pathname.startsWith("/pet-owner/");
 

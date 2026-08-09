@@ -13,6 +13,8 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [keepSignedIn, setKeepSignedIn] = useState(false)
+  const [checkboxError, setCheckboxError] = useState('')
   const loginNavigationStarted = useRef(false)
 
   const navigate = useNavigate()
@@ -22,6 +24,13 @@ const Login = () => {
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
+
+    if (!keepSignedIn) {
+      setCheckboxError("Please check 'Keep me signed in' to continue.")
+      return
+    }
+
+    setCheckboxError('')
     setLoading(true)
 
     try {
@@ -81,7 +90,7 @@ const Login = () => {
                 className='mf-field mt-1.5 !py-3'
                 type='email'
                 required
-                autoComplete='email'
+                autoComplete='username'
                 placeholder='you@example.com'
               />
             </div>
@@ -118,10 +127,23 @@ const Login = () => {
               </div>
             </div>
 
-            <label className='flex items-center gap-2 text-[13px] font-medium text-muted'>
-              <input type='checkbox' className='h-4 w-4 rounded border-line text-primary focus:ring-primary' />
-              Keep me signed in
-            </label>
+            <div>
+              <label className='flex items-center gap-2 text-[13px] font-medium text-muted'>
+                <input
+                  type='checkbox'
+                  className='h-4 w-4 rounded border-line text-primary focus:ring-primary'
+                  checked={keepSignedIn}
+                  onChange={(e) => {
+                    setKeepSignedIn(e.target.checked)
+                    if (e.target.checked) setCheckboxError('')
+                  }}
+                />
+                Keep me signed in
+              </label>
+              {checkboxError && (
+                <p className='mt-1.5 text-[13px] font-semibold text-red-600'>{checkboxError}</p>
+              )}
+            </div>
 
             <button disabled={loading} className='mf-button w-full !py-3 text-sm'>
               {loading ? 'Signing in...' : 'Sign In'}

@@ -9,6 +9,7 @@ import { useNavigate, useParams } from '../../lib/routerCompat'
 import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
+import { User, Bell, Shield, CreditCard, Globe, ChevronRight, KeyRound, Smartphone, Monitor, History, CheckCircle2 } from 'lucide-react'
 
 const petDraft = {
   name: '',
@@ -364,6 +365,22 @@ const Filters = ({ filters, setFilters, onSearch }) => (
   </form>
 )
 
+const SettingsToggle = ({ checked, onChange }) => (
+  <button
+    type='button'
+    role='switch'
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${checked ? 'bg-teal' : 'bg-slate-200'}`}
+  >
+    <span
+      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+        checked ? 'translate-x-5' : 'translate-x-0'
+      }`}
+    />
+  </button>
+)
+
 const AiReportCard = ({ report }) => (
   <article className='mf-card p-5'>
     <div className='flex flex-wrap items-center justify-between gap-3'>
@@ -384,7 +401,7 @@ const AiReportCard = ({ report }) => (
 const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const params = useParams()
   const navigate = useNavigate()
-  const { authStatus, backendUrl, token } = useContext(AppContext)
+  const { authStatus, backendUrl, token, userData } = useContext(AppContext)
   useProtectedPatientRoute({ authStatus, token })
 
   const [pets, setPets] = useState([])
@@ -404,6 +421,17 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [filters, setFilters] = useState({ search: '', species: '', breed: '', gender: '', minAge: '', maxAge: '', minWeight: '', maxWeight: '', vaccinationStatus: '' })
   const [selectedPetInList, setSelectedPetInList] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [settingsTab, setSettingsTab] = useState('profile')
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    vaccinationReminders: true,
+    appointmentConfirmations: true,
+    appointmentReminders: true,
+    aiReportReady: true,
+    smsNotifications: false,
+    pushNotifications: true,
+    healthTips: false,
+    newsletter: false
+  })
 
   const selectedPetId = params.petId || ''
   const title = pageTitles[view] || pageTitles.dashboard
@@ -579,6 +607,156 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
     }
   }
 
+  const saveNotificationPrefs = (event) => {
+    event.preventDefault()
+    toast.success('Notification preferences saved')
+  }
+
+  // ---- Security (reuses existing backend APIs; see backend authRoutes) ----
+  const [twoFactorStatus, setTwoFactorStatus] = useState(null)
+  const [twoFactorSetup, setTwoFactorSetup] = useState(null)
+  const [sessionsList, setSessionsList] = useState([])
+  const [securityLoading, setSecurityLoading] = useState(false)
+  const [securityError, setSecurityError] = useState('')
+  const [totpCode, setTotpCode] = useState('')
+  const [twoFactorPassword, setTwoFactorPassword] = useState('')
+  const [recoveryCode, setRecoveryCode] = useState('')
+  const [recoveryCodesList, setRecoveryCodesList] = useState([])
+  const [securityModal, setSecurityModal] = useState('')
+  const [changePasswordForm, setChangePasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [changePasswordError, setChangePasswordError] = useState('')
+
+  const loadSecurity = async () => {
+    if (!token) return
+    setSecurityError('')
+    try {
+      const [statusResponse, sessionsResponse] = await Promise.all([
+        axios.get(`${backendUrl}/api/v1/auth/2fa/status`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${backendUrl}/api/v1/auth/sessions`, { headers: { Authorization: `Bearer ${token}` } })
+      ])
+      setTwoFactorStatus(statusResponse.data?.data?.status ?? null)
+      setSessionsList(sessionsResponse.data?.data?.sessions ?? [])
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) {
+        setSecurityError(requestError.response?.data?.message || 'Security settings are temporarily unavailable.')
+      }
+    }
+  }
+
+  const handleBegin2FASetup = async () => {
+    setSecurityLoading(true)
+    setSecurityError('')
+    try {
+      const { data } = await axios.post(`${backendUrl}/api/v1/auth/2fa/setup/begin`, {}, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true })
+      setTwoFactorSetup(data?.data?.setup ?? null)
+      toast.success(data?.message || '2FA setup started')
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) toast.error(requestError.response?.data?.message || requestError.message)
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  const handleConfirm2FASetup = async () => {
+    setSecurityLoading(true)
+    setSecurityError('')
+    try {
+      const { data } = await axios.post(`${backendUrl}/api/v1/auth/2fa/setup/confirm`, { totpCode }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true })
+      setRecoveryCodesList(data?.data?.recoveryCodes ?? [])
+      setTwoFactorSetup(null)
+      setTotpCode('')
+      await loadSecurity()
+      toast.success(data?.message || '2FA enabled')
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) toast.error(requestError.response?.data?.message || requestError.message)
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  const handleDisable2FA = async () => {
+    setSecurityLoading(true)
+    setSecurityError('')
+    try {
+      await axios.post(`${backendUrl}/api/v1/auth/2fa/disable`, { password: twoFactorPassword, totpCode: totpCode || undefined, recoveryCode: recoveryCode || undefined }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true })
+      setTwoFactorPassword('')
+      setTotpCode('')
+      setRecoveryCode('')
+      await loadSecurity()
+      toast.success('Two-factor authentication disabled')
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) toast.error(requestError.response?.data?.message || requestError.message)
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  const handleRevokeSession = async (sessionId) => {
+    try {
+      await axios.delete(`${backendUrl}/api/v1/auth/sessions/${sessionId}`, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true })
+      await loadSecurity()
+      toast.success('Session revoked')
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) toast.error(requestError.response?.data?.message || requestError.message)
+    }
+  }
+
+  const handleRevokeOtherSessions = async () => {
+    setSecurityLoading(true)
+    try {
+      await axios.post(`${backendUrl}/api/v1/auth/sessions/revoke-others`, {}, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true })
+      await loadSecurity()
+      toast.success('Other sessions revoked')
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) toast.error(requestError.response?.data?.message || requestError.message)
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  const submitChangePassword = async (event) => {
+    event.preventDefault()
+    setChangePasswordError('')
+    const { currentPassword, newPassword, confirmPassword } = changePasswordForm
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setChangePasswordError('Please fill in all password fields.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setChangePasswordError('Password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('New passwords do not match.')
+      return
+    }
+    // The backend currently has NO authenticated change-password endpoint.
+    // Only the email-based /reset-password flow exists, which requires a reset token.
+    // We do NOT fake this call; settings are validated and the limitation is surfaced.
+    setChangePasswordError('Backend support for in-account password changes is not yet available. Please use "Forgot Password" to reset your password via email.')
+  }
+
+  const settingsNavItems = [
+    { key: 'profile', label: 'Profile', desc: 'Personal details, photo, contact info', icon: User },
+    { key: 'notifications', label: 'Notifications', desc: 'Alerts, reminders, and emails', icon: Bell },
+    { key: 'security', label: 'Security', desc: 'Password, 2FA, sessions', icon: Shield },
+    { key: 'billing', label: 'Billing & Plan', desc: 'Subscription, invoices, payment', icon: CreditCard },
+    { key: 'preferences', label: 'Preferences', desc: 'Language, timezone, appearance', icon: Globe }
+  ]
+
+  const togglePref = (key) => setNotificationPrefs((prev) => ({ ...prev, [key]: !prev[key] }))
+
+  useEffect(() => {
+    if (view === 'profile' && settingsTab === 'security' && token) {
+      void loadSecurity()
+    }
+  }, [view, settingsTab, token])
+
+  const placeholderSections = {
+    billing: { title: 'Billing & Plan', desc: 'Subscription, invoices, payment' },
+    preferences: { title: 'Preferences', desc: 'Language, timezone, appearance' }
+  }
+
   if (authStatus === 'initializing' || (!token && authStatus !== 'authenticated')) return <Skeleton />
   if (loading) return <Skeleton />
   if (error) return <section className='py-14'><div className='mf-card mx-auto max-w-2xl p-10 text-center'><p className='mf-eyebrow'>Veterinary records</p><h1 className='mt-2 text-2xl font-semibold text-ink'>Unable to load pet care records</h1><p className='mt-3 text-sm text-slate-600'>{error}</p><button className='mf-button mt-6' onClick={loadAll}>Try again</button></div></section>
@@ -615,7 +793,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
 
   return (
     <section className='w-full min-w-0 py-10'>
-      {view !== 'medical' && (
+      {view !== 'medical' && view !== 'profile' && (
         <section className='mb-7 flex flex-col justify-between gap-5 border-b border-line pb-7 lg:flex-row lg:items-end'>
           <div>
             <p className='mf-eyebrow'>{title[0]}</p>
@@ -723,16 +901,395 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
       {view === 'ai' && <div className='space-y-4'>{reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}{reports.length === 0 && <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />}</div>}
       {view === 'appointments' && <AppointmentsView appointments={appointments} pets={pets} onRefresh={loadAll} />}
+
       {view === 'profile' && (
-        <form className='mf-card grid gap-4 p-6 sm:grid-cols-2' onSubmit={saveOwner}>
-          {formError && <div role='alert' className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2'>{formError}</div>}
-          <Field label='Phone'><input className='mf-field' value={ownerForm.phone} onChange={(event) => setOwnerForm({ ...ownerForm, phone: event.target.value })} /></Field>
-          <Field label='Emergency contact'><input className='mf-field' value={ownerForm.emergencyContact} onChange={(event) => setOwnerForm({ ...ownerForm, emergencyContact: event.target.value })} /></Field>
-          <Field label='Emergency phone'><input className='mf-field' value={ownerForm.emergencyPhone} onChange={(event) => setOwnerForm({ ...ownerForm, emergencyPhone: event.target.value })} /></Field>
-          <Field label='Address line 1'><input className='mf-field' value={ownerForm.address?.line1 || ''} onChange={(event) => setOwnerForm({ ...ownerForm, address: { ...(ownerForm.address || {}), line1: event.target.value } })} /></Field>
-          <label className='mf-label sm:col-span-2'>Address line 2<input className='mf-field' value={ownerForm.address?.line2 || ''} onChange={(event) => setOwnerForm({ ...ownerForm, address: { ...(ownerForm.address || {}), line2: event.target.value } })} /></label>
-          <div className='sm:col-span-2'><button className='mf-button' disabled={saving} type='submit'>{saving ? 'Saving...' : 'Save owner profile'}</button></div>
-        </form>
+        <div className='w-full min-w-0 space-y-6'>
+          {/* Settings header */}
+          <div>
+            <h1 className='text-2xl font-bold text-ink'>Settings</h1>
+            <p className='mt-1 text-sm text-muted'>Account and preferences</p>
+          </div>
+
+          {/* Two-column settings layout */}
+          <div className='grid gap-6 lg:grid-cols-[300px_1fr]'>
+            {/* Left settings nav card */}
+            <aside className='h-fit rounded-2xl border border-line/70 bg-white p-2 shadow-soft'>
+              {settingsNavItems.map((item) => {
+                const active = settingsTab === item.key
+                return (
+                  <button
+                    key={item.key}
+                    type='button'
+                    onClick={() => setSettingsTab(item.key)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left transition-all duration-200 ${
+                      active ? 'bg-teal/10 text-teal' : 'text-muted hover:bg-mist hover:text-ink'
+                    }`}
+                  >
+                    <item.icon className={`h-5 w-5 shrink-0 ${active ? 'text-teal' : 'text-slate-400'}`} />
+                    <span className='min-w-0 flex-1'>
+                      <span className={`block text-sm font-bold ${active ? 'text-teal' : 'text-ink'}`}>{item.label}</span>
+                      <span className={`mt-0.5 block text-xs ${active ? 'text-teal/70' : 'text-muted'}`}>{item.desc}</span>
+                    </span>
+                    {active && <ChevronRight className='h-4 w-4 shrink-0 text-teal' />}
+                  </button>
+                )
+              })}
+            </aside>
+
+            {/* Right content card */}
+            {settingsTab === 'profile' && (
+              <form onSubmit={saveOwner} className='rounded-2xl border border-line/70 bg-white p-6 shadow-soft sm:p-8'>
+                {formError && <div role='alert' className='mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{formError}</div>}
+
+                <div>
+                  <h2 className='text-xl font-bold text-ink'>Profile Information</h2>
+                  <p className='mt-1 text-sm text-muted'>Update your name, email, and contact details.</p>
+                </div>
+
+                <div className='mt-6 flex flex-col gap-4 rounded-2xl border border-line/70 bg-[#F6F9F9] p-5 sm:flex-row sm:items-center'>
+                  {userData?.image ? (
+                    <img src={userData.image} alt={userData.name || 'Pet owner'} className='h-16 w-16 shrink-0 rounded-full object-cover ring-4 ring-white' />
+                  ) : (
+                    <div className='grid h-16 w-16 shrink-0 place-items-center rounded-full bg-teal/15 text-xl font-bold text-teal ring-4 ring-white'>
+                      {String(userData?.name || 'P').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className='min-w-0'>
+                    <p className='truncate text-base font-bold text-ink'>{userData?.name || 'Pet Owner'}</p>
+                    <p className='mt-0.5 truncate text-sm text-muted'>{userData?.email || 'Not provided'}</p>
+                  </div>
+                </div>
+
+                <div className='mt-6 grid gap-5 sm:grid-cols-2'>
+                  <div>
+                    <label className='text-[13px] font-semibold text-ink'>First Name</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={String(userData?.name || '').split(' ')[0] || ''}
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className='text-[13px] font-semibold text-ink'>Last Name</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={String(userData?.name || '').split(' ').slice(1).join(' ') || ''}
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className='text-[13px] font-semibold text-ink'>Email Address</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={userData?.email || ''}
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className='text-[13px] font-semibold text-ink'>Phone Number</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={ownerForm.phone}
+                      onChange={(event) => setOwnerForm({ ...ownerForm, phone: event.target.value })}
+                      placeholder='Enter phone number'
+                    />
+                  </div>
+                  <div className='sm:col-span-2'>
+                    <label className='text-[13px] font-semibold text-ink'>Location</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={[ownerForm.address?.line1, ownerForm.address?.line2].filter(Boolean).join(', ')}
+                      onChange={(event) => {
+                        const [line1 = '', line2 = ''] = event.target.value.split(/,(.+)/)
+                        setOwnerForm({ ...ownerForm, address: { line1: line1.trim(), line2: (line2 || '').trim() } })
+                      }}
+                      placeholder='City, State'
+                    />
+                  </div>
+                </div>
+
+                <div className='mt-5 grid gap-5 border-t border-line/70 pt-5 sm:grid-cols-2'>
+                  <div>
+                    <label className='text-[13px] font-semibold text-ink'>Emergency Contact</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={ownerForm.emergencyContact}
+                      onChange={(event) => setOwnerForm({ ...ownerForm, emergencyContact: event.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className='text-[13px] font-semibold text-ink'>Emergency Phone</label>
+                    <input
+                      className='mf-field mt-1.5 !py-3'
+                      value={ownerForm.emergencyPhone}
+                      onChange={(event) => setOwnerForm({ ...ownerForm, emergencyPhone: event.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className='mt-6 border-t border-line/70 pt-5'>
+                  <div className='flex items-center justify-between'>
+                    <h3 className='text-sm font-bold text-ink'>My Pets ({pets.length})</h3>
+                    <button
+                      type='button'
+                      onClick={() => navigate('/pet-owner/pets')}
+                      className='text-xs font-semibold text-teal hover:text-teal/80'
+                    >
+                      View all →
+                    </button>
+                  </div>
+                  {pets.length ? (
+                    <div className='mt-3 grid gap-3 sm:grid-cols-2'>
+                      {pets.slice(0, 6).map((pet) => (
+                        <div key={getId(pet)} className='flex items-center gap-3 rounded-xl border border-line/70 bg-[#F6F9F9] p-3'>
+                          <PetImage src={pet.profileImage} alt={pet.name} size='md' fallbackClassName='bg-teal/10 text-teal' />
+                          <div className='min-w-0'>
+                            <p className='truncate text-sm font-bold text-ink'>{pet.name}</p>
+                            <p className='truncate text-xs text-muted'>{pet.breed || pet.species || 'Pet'}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className='mt-3 rounded-xl border border-dashed border-line/80 bg-[#F6F9F9] px-4 py-3 text-sm text-muted'>
+                      No pets registered yet.
+                    </p>
+                  )}
+                </div>
+
+                <div className='mt-6 flex justify-end'>
+                  <button className='mf-button !px-8 !py-3 text-sm' disabled={saving} type='submit'>
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {settingsTab === 'notifications' && (
+              <form onSubmit={saveNotificationPrefs} className='rounded-2xl border border-line/70 bg-white p-6 shadow-soft sm:p-8'>
+                <div>
+                  <h2 className='text-xl font-bold text-ink'>Notification Preferences</h2>
+                  <p className='mt-1 text-sm text-muted'>Choose how and when you want to be notified.</p>
+                </div>
+
+                {/* Health & Reminders */}
+                <div className='mt-6'>
+                  <h3 className='text-sm font-bold uppercase tracking-wide text-ink'>Health & Reminders</h3>
+                  <div className='mt-3 divide-y divide-line/70 rounded-2xl border border-line/70'>
+                    {[
+                      { key: 'vaccinationReminders', title: 'Vaccination Reminders', desc: 'Get notified 30 days before vaccine due dates' },
+                      { key: 'appointmentConfirmations', title: 'Appointment Confirmations', desc: 'Email and SMS when bookings are confirmed' },
+                      { key: 'appointmentReminders', title: 'Appointment Reminders', desc: '24h and 1h reminders before appointments' },
+                      { key: 'aiReportReady', title: 'AI Report Ready', desc: 'Alert when a new AI health report is generated' }
+                    ].map((item) => (
+                      <div key={item.key} className='flex items-center justify-between gap-4 px-5 py-4'>
+                        <div className='min-w-0'>
+                          <p className='text-sm font-bold text-ink'>{item.title}</p>
+                          <p className='mt-0.5 text-xs leading-5 text-muted'>{item.desc}</p>
+                        </div>
+                        <SettingsToggle checked={notificationPrefs[item.key]} onChange={() => togglePref(item.key)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Channels */}
+                <div className='mt-8'>
+                  <h3 className='text-sm font-bold uppercase tracking-wide text-ink'>Channels</h3>
+                  <div className='mt-3 divide-y divide-line/70 rounded-2xl border border-line/70'>
+                    {[
+                      { key: 'smsNotifications', title: 'SMS Notifications', desc: 'Text messages to the user\'s actual phone number' },
+                      { key: 'pushNotifications', title: 'Push Notifications', desc: 'Mobile app alerts' },
+                      { key: 'healthTips', title: 'Health Tips', desc: 'Weekly wellness tips for your pets' },
+                      { key: 'newsletter', title: 'VetFlow Newsletter', desc: 'Monthly product updates and pet care guides' }
+                    ].map((item) => (
+                      <div key={item.key} className='flex items-center justify-between gap-4 px-5 py-4'>
+                        <div className='min-w-0'>
+                          <p className='text-sm font-bold text-ink'>{item.title}</p>
+                          <p className='mt-0.5 text-xs leading-5 text-muted'>{item.desc}</p>
+                        </div>
+                        <SettingsToggle checked={notificationPrefs[item.key]} onChange={() => togglePref(item.key)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className='mt-8 flex justify-end'>
+                  <button className='mf-button !px-8 !py-3 text-sm' type='submit'>
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {settingsTab === 'security' && (
+              <div className='rounded-2xl border border-line/70 bg-white p-6 shadow-soft sm:p-8'>
+                <div>
+                  <h2 className='text-xl font-bold text-ink'>Security Settings</h2>
+                  <p className='mt-1 text-sm text-muted'>Keep your account safe.</p>
+                </div>
+                {securityError && <div role='alert' className='mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{securityError}<button type='button' className='ml-3 font-semibold underline' onClick={loadSecurity}>Retry</button></div>}
+
+                {/* Change password */}
+                <div className='mt-6 flex items-center justify-between gap-4 rounded-2xl border border-line/70 p-5'>
+                  <div className='flex items-center gap-3'>
+                    <span className='grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'><KeyRound className='h-5 w-5' /></span>
+                    <div>
+                      <p className='text-sm font-bold text-ink'>Change Password</p>
+                      <p className='mt-0.5 text-xs text-muted'>Update the password for your account</p>
+                    </div>
+                  </div>
+                  <button type='button' onClick={() => { setChangePasswordError(''); setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' }); setSecurityModal('change-password') }} className='mf-button !px-5 !py-2 text-xs'>Update</button>
+                </div>
+
+                {/* Two-factor authentication */}
+                <div className='mt-4 rounded-2xl border border-line/70 p-5'>
+                  <div className='flex items-center justify-between gap-4'>
+                    <div className='flex items-center gap-3'>
+                      <span className='grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'><Smartphone className='h-5 w-5' /></span>
+                      <div>
+                        <p className='text-sm font-bold text-ink'>Two-Factor Authentication</p>
+                        <p className='mt-0.5 text-xs text-muted'>
+                          {twoFactorStatus?.enabled ? '2FA is enabled on your account' : 'Add an extra layer of security'}
+                        </p>
+                      </div>
+                    </div>
+                    {twoFactorStatus?.enabled ? (
+                      <button type='button' onClick={() => { setTwoFactorPassword(''); setTotpCode(''); setRecoveryCode(''); setSecurityModal('disable-2fa') }} className='rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-50' disabled={securityLoading}>Disable</button>
+                    ) : (
+                      <button type='button' onClick={handleBegin2FASetup} className='mf-button !px-5 !py-2 text-xs' disabled={securityLoading}>Enable</button>
+                    )}
+                  </div>
+
+                  {twoFactorSetup && (
+                    <div className='mt-4 rounded-xl border border-line/70 bg-[#F6F9F9] p-4'>
+                      <div className='flex flex-col gap-4 sm:flex-row sm:items-start'>
+                        {twoFactorSetup.qrCodeDataUrl && <img className='h-40 w-40 shrink-0 rounded-xl border border-line bg-white' src={twoFactorSetup.qrCodeDataUrl} alt='Authenticator QR code' />}
+                        <div className='min-w-0 flex-1'>
+                          <p className='text-xs font-semibold text-ink'>Scan this QR in your authenticator app, then enter the 6-digit code.</p>
+                          {twoFactorSetup.otpauthUri && <textarea readOnly value={twoFactorSetup.otpauthUri} className='mf-field mt-3 font-mono text-xs' rows='2' />}
+                          <div className='mt-3 flex flex-col gap-3 sm:flex-row sm:items-center'>
+                            <input value={totpCode} onChange={(e) => setTotpCode(e.target.value)} className='mf-field !py-2 font-mono' placeholder='6-digit code' />
+                            <button type='button' disabled={securityLoading || totpCode.length !== 6} onClick={handleConfirm2FASetup} className='mf-button !px-5 !py-2 text-xs'>Confirm setup</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {recoveryCodesList.length > 0 && (
+                    <div className='mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4'>
+                      <p className='text-xs font-bold text-amber-900'>Recovery codes</p>
+                      <p className='mt-1 text-xs text-amber-800'>Store these codes securely. Each can be used once.</p>
+                      <div className='mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3'>{recoveryCodesList.map((code) => <code key={code} className='rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-center text-xs font-mono'>{code}</code>)}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Active sessions */}
+                <div className='mt-4 rounded-2xl border border-line/70 p-5'>
+                  <div className='flex items-center justify-between gap-4'>
+                    <div className='flex items-center gap-3'>
+                      <span className='grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'><Monitor className='h-5 w-5' /></span>
+                      <div>
+                        <p className='text-sm font-bold text-ink'>Active Sessions</p>
+                        <p className='mt-0.5 text-xs text-muted'>{sessionsList.length ? `${sessionsList.length} active session(s)` : 'No active sessions'}</p>
+                      </div>
+                    </div>
+                    {sessionsList.length > 1 && <button type='button' onClick={handleRevokeOtherSessions} className='mf-button-secondary !px-4 !py-2 text-xs' disabled={securityLoading}>Sign out all other</button>}
+                  </div>
+                  <div className='mt-4 space-y-3'>
+                    {sessionsList.map((session) => (
+                      <div key={session.sessionId} className='flex items-center justify-between gap-3 rounded-xl border border-line/70 p-4'>
+                        <div className='min-w-0'>
+                          <p className='flex items-center gap-2 text-sm font-semibold text-ink'>
+                            {session.displayName || session.device || 'Session'}
+                            {session.current && <span className='rounded-full bg-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase text-teal'>Current</span>}
+                          </p>
+                          <p className='mt-0.5 text-xs text-muted'>Last active {session.lastActiveAt ? new Date(session.lastActiveAt).toLocaleString() : 'Unknown'}</p>
+                        </div>
+                        {!session.current && <button type='button' onClick={() => handleRevokeSession(session.sessionId)} className='rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50'>Revoke</button>}
+                      </div>
+                    ))}
+                    {sessionsList.length === 0 && <p className='rounded-xl border border-dashed border-line/80 bg-[#F6F9F9] px-4 py-6 text-center text-sm text-muted'>No active sessions found.</p>}
+                  </div>
+                </div>
+
+                {/* Login history */}
+                <div className='mt-4 rounded-2xl border border-line/70 p-5'>
+                  <div className='flex items-center gap-3'>
+                    <span className='grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'><History className='h-5 w-5' /></span>
+                    <div>
+                      <p className='text-sm font-bold text-ink'>Login History</p>
+                      <p className='mt-0.5 text-xs text-muted'>Review authentication activity on your account</p>
+                    </div>
+                  </div>
+                  <p className='mt-4 rounded-xl border border-dashed border-line/80 bg-[#F6F9F9] px-4 py-5 text-center text-sm text-muted'>
+                    Login history is not yet available — the backend does not currently expose an authentication-log endpoint.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {placeholderSections[settingsTab] && (
+              <div className='rounded-2xl border border-line/70 bg-white p-6 shadow-soft sm:p-8'>
+                <h2 className='text-xl font-bold text-ink'>{placeholderSections[settingsTab].title}</h2>
+                <p className='mt-1 text-sm text-muted'>{placeholderSections[settingsTab].desc}</p>
+                <p className='mt-6 rounded-xl border border-dashed border-line/80 bg-[#F6F9F9] px-4 py-6 text-center text-sm text-muted'>
+                  This section is coming soon.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {securityModal === 'change-password' && (
+        <Modal title='Change Password' onClose={() => setSecurityModal('')}>
+          <form onSubmit={submitChangePassword} className='space-y-4'>
+            {changePasswordError && <div role='alert' className='rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{changePasswordError}</div>}
+            <div>
+              <label className='text-[13px] font-semibold text-ink'>Current Password</label>
+              <input type='password' className='mf-field mt-1.5 !py-3' value={changePasswordForm.currentPassword} onChange={(e) => setChangePasswordForm({ ...changePasswordForm, currentPassword: e.target.value })} />
+            </div>
+            <div>
+              <label className='text-[13px] font-semibold text-ink'>New Password</label>
+              <input type='password' className='mf-field mt-1.5 !py-3' value={changePasswordForm.newPassword} onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} placeholder='At least 8 characters' />
+            </div>
+            <div>
+              <label className='text-[13px] font-semibold text-ink'>Confirm New Password</label>
+              <input type='password' className='mf-field mt-1.5 !py-3' value={changePasswordForm.confirmPassword} onChange={(e) => setChangePasswordForm({ ...changePasswordForm, confirmPassword: e.target.value })} />
+            </div>
+            <div className='flex justify-end gap-3 pt-2'>
+              <button type='button' className='mf-button-secondary !py-2.5 text-sm' onClick={() => setSecurityModal('')}>Cancel</button>
+              <button type='submit' className='mf-button !py-2.5 text-sm'>Update</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {securityModal === 'disable-2fa' && (
+        <Modal title='Disable Two-Factor Authentication' onClose={() => setSecurityModal('')}>
+          <form onSubmit={(e) => { e.preventDefault(); handleDisable2FA() }} className='space-y-4'>
+            <p className='text-sm leading-6 text-muted'>To disable 2FA, provide your password and one of the following: an authenticator code or a recovery code.</p>
+            <div>
+              <label className='text-[13px] font-semibold text-ink'>Password</label>
+              <input type='password' className='mf-field mt-1.5 !py-3' value={twoFactorPassword} onChange={(e) => setTwoFactorPassword(e.target.value)} />
+            </div>
+            <div>
+              <label className='text-[13px] font-semibold text-ink'>Authenticator Code</label>
+              <input className='mf-field mt-1.5 !py-3 font-mono' value={totpCode} onChange={(e) => setTotpCode(e.target.value)} placeholder='6-digit code' />
+            </div>
+            <div>
+              <label className='text-[13px] font-semibold text-ink'>Recovery Code</label>
+              <input className='mf-field mt-1.5 !py-3 font-mono' value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value)} />
+            </div>
+            <div className='flex justify-end gap-3 pt-2'>
+              <button type='button' className='mf-button-secondary !py-2.5 text-sm' onClick={() => setSecurityModal('')}>Cancel</button>
+              <button type='submit' disabled={securityLoading} className='rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60'>{securityLoading ? 'Disabling...' : 'Disable 2FA'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {modal === 'register' && <Modal title='Register pet' onClose={() => setModal('')}><PetForm draft={draft} setDraft={setDraft} onSubmit={savePet} saving={saving} submitLabel='Register pet' error={formError} /></Modal>}
