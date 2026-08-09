@@ -17,6 +17,7 @@ vi.mock("react-toastify", () => ({
 }));
 
 const backendUrl = "http://localhost:4000";
+const patientRefreshUrl = `${backendUrl}/api/v1/auth/refresh/patient`;
 
 const createStorage = () => {
   const values = new Map<string, string>();
@@ -78,7 +79,7 @@ describe("patient auth client", () => {
     const { toast } = await import("react-toastify");
     adapter.mockRejectedValueOnce(
       axiosError({
-        url: `${backendUrl}/api/v1/auth/refresh`,
+        url: patientRefreshUrl,
         skipAuthRefresh: true,
         optionalAuthRequest: true
       })
@@ -122,7 +123,7 @@ describe("patient auth client", () => {
         throw axiosError(config);
       }
 
-      if (config.url === `${backendUrl}/api/v1/auth/refresh`) {
+      if (config.url === patientRefreshUrl) {
         return axiosResponse({ success: true, data: { accessToken: "fresh-token" } });
       }
 
@@ -136,14 +137,14 @@ describe("patient auth client", () => {
 
     expect(profile.data.retriedWith).toBe("fresh-token");
     expect(appointments.data.retriedWith).toBe("fresh-token");
-    expect(adapter.mock.calls.filter(([config]) => config.url === `${backendUrl}/api/v1/auth/refresh`)).toHaveLength(1);
+    expect(adapter.mock.calls.filter(([config]) => config.url === patientRefreshUrl)).toHaveLength(1);
   });
 
   it("clears stale auth and marks the original error when refresh recovery fails", async () => {
     const { toast } = await import("react-toastify");
     storage.getItem.mockReturnValue("expired-token");
     adapter.mockImplementation(async (config) => {
-      if (config.url === `${backendUrl}/api/v1/auth/refresh`) {
+      if (config.url === patientRefreshUrl) {
         throw axiosError(config, 401, "Invalid refresh token");
       }
 
@@ -169,11 +170,11 @@ describe("patient auth client", () => {
 
   it("does not recursively retry refresh endpoint 401s", async () => {
     adapter.mockRejectedValueOnce(
-      axiosError({ url: `${backendUrl}/api/v1/auth/refresh`, skipAuthRefresh: true })
+      axiosError({ url: patientRefreshUrl, skipAuthRefresh: true })
     );
 
     await expect(
-      axios.post(`${backendUrl}/api/v1/auth/refresh`, {}, { skipAuthRefresh: true })
+      axios.post(patientRefreshUrl, {}, { skipAuthRefresh: true })
     ).rejects.toMatchObject({ response: { status: 401 } });
 
     expect(adapter).toHaveBeenCalledTimes(1);
@@ -185,6 +186,18 @@ describe("patient auth client", () => {
     await expect(axios.post(`${backendUrl}/api/user/login`, {})).rejects.toMatchObject({
       response: { status: 401 }
     });
+
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not treat doctor refresh endpoint as a patient refresh", async () => {
+    adapter.mockRejectedValueOnce(
+      axiosError({ url: `${backendUrl}/api/v1/auth/refresh/doctor`, skipAuthRefresh: true })
+    );
+
+    await expect(
+      axios.post(`${backendUrl}/api/v1/auth/refresh/doctor`, {}, { skipAuthRefresh: true })
+    ).rejects.toMatchObject({ response: { status: 401 } });
 
     expect(adapter).toHaveBeenCalledTimes(1);
   });

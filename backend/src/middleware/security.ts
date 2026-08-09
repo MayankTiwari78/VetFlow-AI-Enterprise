@@ -5,7 +5,7 @@ import helmet from "helmet";
 
 import { env } from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
-import { getCookie } from "../utils/cookies.js";
+import { getCookie, refreshCookieNameForRole } from "../utils/cookies.js";
 
 const developmentOrigins = env.isDevelopment
   ? [
@@ -110,7 +110,11 @@ export const otpRateLimiter = authLimiter(
 export const csrfOriginProtection: RequestHandler = (req, _res, next) => {
   const origin = req.get("origin");
   const referer = req.get("referer");
-  const refreshCookie = getCookie(req, env.COOKIE_NAME);
+  const refreshCookie =
+    getCookie(req, env.COOKIE_NAME) ||
+    getCookie(req, refreshCookieNameForRole("patient")) ||
+    getCookie(req, refreshCookieNameForRole("doctor")) ||
+    getCookie(req, refreshCookieNameForRole("admin"));
 
   let requestOrigin = origin;
 

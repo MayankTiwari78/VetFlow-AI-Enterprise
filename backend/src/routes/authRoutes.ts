@@ -6,7 +6,13 @@ import {
   loginDoctor,
   loginUser,
   logout,
+  logoutAdmin,
   logoutAll,
+  logoutDoctor,
+  logoutPatient,
+  refreshAdminToken,
+  refreshDoctorToken,
+  refreshPatientToken,
   refreshToken,
   registerUser,
   requestOtpChallenge,
@@ -112,10 +118,49 @@ authRouter.post(
   refreshToken
 );
 authRouter.post(
+  "/refresh/patient",
+  refreshRateLimiter,
+  csrfOriginProtection,
+  validateRequest({ body: emptyBodySchema }),
+  refreshPatientToken
+);
+authRouter.post(
+  "/refresh/doctor",
+  refreshRateLimiter,
+  csrfOriginProtection,
+  validateRequest({ body: emptyBodySchema }),
+  refreshDoctorToken
+);
+authRouter.post(
+  "/refresh/admin",
+  refreshRateLimiter,
+  csrfOriginProtection,
+  validateRequest({ body: emptyBodySchema }),
+  refreshAdminToken
+);
+authRouter.post(
   "/logout",
   csrfOriginProtection,
   validateRequest({ body: emptyBodySchema }),
   logout
+);
+authRouter.post(
+  "/logout/patient",
+  csrfOriginProtection,
+  validateRequest({ body: emptyBodySchema }),
+  logoutPatient
+);
+authRouter.post(
+  "/logout/doctor",
+  csrfOriginProtection,
+  validateRequest({ body: emptyBodySchema }),
+  logoutDoctor
+);
+authRouter.post(
+  "/logout/admin",
+  csrfOriginProtection,
+  validateRequest({ body: emptyBodySchema }),
+  logoutAdmin
 );
 authRouter.post(
   "/logout-all",

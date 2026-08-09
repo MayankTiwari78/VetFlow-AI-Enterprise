@@ -11,6 +11,8 @@ let sessionExpiredToastShown = false
 
 const tokenKeyForRole = (role) => (role === 'doctor' ? 'dToken' : 'aToken')
 const headerForRole = (role) => (role === 'doctor' ? 'dToken' : 'aToken')
+const refreshEndpointForRole = (role) =>
+  role === 'doctor' ? '/api/v1/auth/refresh/doctor' : '/api/v1/auth/refresh/admin'
 const sessionExpiredToastId = 'portal-session-expired'
 const inBrowser = () => typeof window !== 'undefined'
 
@@ -27,7 +29,10 @@ const roleForUrl = (url = '') => {
 }
 
 const authEndpoint = (url = '') => url.includes('/api/v1/auth/')
-const refreshEndpoint = (url = '') => url.includes('/api/v1/auth/refresh')
+const refreshEndpoint = (url = '') =>
+  url.includes('/api/v1/auth/refresh') ||
+  url.includes('/api/v1/auth/refresh/doctor') ||
+  url.includes('/api/v1/auth/refresh/admin')
 
 export const resetPortalSessionExpiredNotification = () => {
   sessionExpiredToastShown = false
@@ -81,7 +86,7 @@ const refreshTokenForRole = async (expectedRole) => {
   if (!refreshPromise) {
     refreshPromise = axios
       .post(
-        backendBaseUrl + '/api/v1/auth/refresh',
+        backendBaseUrl + refreshEndpointForRole(expectedRole),
         {},
         { withCredentials: true, skipAuthRefresh: true }
       )
@@ -176,10 +181,23 @@ export const configureAdminAuth = ({ backendUrl, setAToken, setDToken, onAuthCle
   )
 }
 
+const logoutRole = () => {
+  if (inBrowser()) {
+    if (window.localStorage.getItem('dToken')) {
+      return 'doctor'
+    }
+    if (window.localStorage.getItem('aToken')) {
+      return 'admin'
+    }
+  }
+  return 'admin'
+}
+
 export const logoutAdminSession = async (backendUrl) => {
+  const role = logoutRole()
   try {
     await axios.post(
-      backendUrl + '/api/v1/auth/logout',
+      backendUrl + `/api/v1/auth/logout/${role}`,
       {},
       { withCredentials: true, skipAuthRefresh: true }
     )

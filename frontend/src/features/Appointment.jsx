@@ -6,6 +6,7 @@ import RelatedDoctors from '../components/RelatedDoctors'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { isAuthSessionHandledError } from '../api/authClient'
+import { useProtectedPatientRoute } from '../hooks/useProtectedPatientRoute'
 import { loginHrefForReturnTo } from '../lib/authNavigation'
 
 const Appointment = () => {
@@ -13,6 +14,8 @@ const Appointment = () => {
     const { docId } = useParams()
     const { authStatus, doctors, doctorsLoading, doctorsError, currencySymbol, backendUrl, token, getDoctosData } = useContext(AppContext)
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+
+    useProtectedPatientRoute({ authStatus, token })
 
     const [docInfo, setDocInfo] = useState(false)
     const [docSlots, setDocSlots] = useState([])
@@ -107,7 +110,7 @@ const Appointment = () => {
         }
     }, [docInfo])
 
-    if (doctorsLoading) {
+    if (doctorsLoading || authStatus === 'initializing' || !token) {
         return <div className='py-12'><div className='mf-card h-96 animate-pulse bg-[#EAF3F4]' /></div>
     }
 

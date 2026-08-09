@@ -34,7 +34,7 @@ const requestMetadata = (req: Request) => ({
   userAgent: req.get("user-agent")
 });
 
-const sendLoginResponse = (res: Response, result: LoginResult) => {
+const sendLoginResponse = (res: Response, result: LoginResult, role: AccountType) => {
   if (result.requiresTwoFactor) {
     return sendSuccess(res, 202, "Two-factor verification required", {
       requiresTwoFactor: true,
@@ -44,7 +44,7 @@ const sendLoginResponse = (res: Response, result: LoginResult) => {
     });
   }
 
-  setRefreshTokenCookie(res, result.refreshToken, result.refreshTokenExpiresAt);
+  setRefreshTokenCookie(res, role, result.refreshToken, result.refreshTokenExpiresAt);
   return sendSuccess(
     res,
     200,
@@ -83,19 +83,19 @@ export const registerUser: RequestHandler = asyncHandler(async (req, res) => {
 export const loginUser: RequestHandler = asyncHandler(async (req, res) => {
   const { email, password } = req.body as { email: string; password: string };
   const result = await loginPatient(email, password, requestMetadata(req));
-  sendLoginResponse(res, result);
+  sendLoginResponse(res, result, "patient");
 });
 
 export const loginDoctor: RequestHandler = asyncHandler(async (req, res) => {
   const { email, password } = req.body as { email: string; password: string };
   const result = await loginDoctorAccount(email, password, requestMetadata(req));
-  sendLoginResponse(res, result);
+  sendLoginResponse(res, result, "doctor");
 });
 
 export const loginAdmin: RequestHandler = asyncHandler(async (req, res) => {
   const { email, password } = req.body as { email: string; password: string };
   const result = await loginAdminAccount(email, password, requestMetadata(req));
-  sendLoginResponse(res, result);
+  sendLoginResponse(res, result, "admin");
 });
 
 export const unifiedLogin: RequestHandler = asyncHandler(async (req, res) => {
@@ -105,7 +105,7 @@ export const unifiedLogin: RequestHandler = asyncHandler(async (req, res) => {
     accountType: AccountType;
   };
   const result = await loginAccount(accountType, email, password, requestMetadata(req));
-  sendLoginResponse(res, result);
+  sendLoginResponse(res, result, accountType);
 });
 
 export const verifyTwoFactorLoginRequest: RequestHandler = asyncHandler(async (req, res) => {
@@ -120,37 +120,49 @@ export const verifyTwoFactorLoginRequest: RequestHandler = asyncHandler(async (r
     recoveryCode,
     requestMetadata(req)
   );
-  sendLoginResponse(res, result);
+  sendLoginResponse(res, result, result.account.role);
 });
 
-export const refreshToken: RequestHandler = asyncHandler(async (req, res) => {
-  const refreshCookie = getRefreshTokenCookie(req);
+const refreshTokenForRole = (role: AccountType): RequestHandler =>
+  asyncHandler(async (req, res) => {
+    const refreshCookie = getRefreshTokenCookie(req, role);
 
-  if (!refreshCookie) {
-    throw new AppError("Invalid refresh token", 401);
-  }
+    if (!refreshCookie) {
+      throw new AppError("Invalid refresh token", 401);
+    }
 
-  const result = await refreshAccessToken(refreshCookie, requestMetadata(req));
-  setRefreshTokenCookie(res, result.refreshToken, result.refreshTokenExpiresAt);
-  sendSuccess(
-    res,
-    200,
-    "Token refreshed",
-    {
-      accessToken: result.accessToken,
-      token: result.token,
-      account: result.account,
-      sessionId: result.sessionId
-    },
-    { token: result.token }
-  );
-});
+    const result = await refreshAccessToken(refreshCookie, requestMetadata(req));
+    setRefreshTokenCookie(res, role, result.refreshToken, result.refreshTokenExpiresAt);
+    sendSuccess(
+      res,
+      200,
+      "Token refreshed",
+      {
+        accessToken: result.accessToken,
+        token: result.token,
+        account: result.account,
+        sessionId: result.sessionId
+      },
+      { token: result.token }
+    );
+  });
 
-export const logout: RequestHandler = asyncHandler(async (req, res) => {
-  await logoutCurrentSession(getRefreshTokenCookie(req));
-  clearRefreshTokenCookie(res);
-  sendSuccess(res, 200, "Logout successful");
-});
+export const refreshToken = refreshTokenForRole("patient");
+export const refreshPatientToken = refreshTokenForRole("patient");
+export const refreshDoctorToken = refreshTokenForRole("doctor");
+export const refreshAdminToken = refreshTokenForRole("admin");
+
+const logoutForRole = (role: AccountType): RequestHandler =>
+  asyncHandler(async (req, res) => {
+    await logoutCurrentSession(getRefreshTokenCookie(req, role));
+    clearRefreshTokenCookie(res, role);
+    sendSuccess(res, 200, "Logout successful");
+  });
+
+export const logout = logoutForRole("patient");
+export const logoutPatient = logoutForRole("patient");
+export const logoutDoctor = logoutForRole("doctor");
+export const logoutAdmin = logoutForRole("admin");
 
 export const logoutAll: RequestHandler = asyncHandler(async (req, res) => {
   const accountType = req.authAccountType;
@@ -167,7 +179,7 @@ export const logoutAll: RequestHandler = asyncHandler(async (req, res) => {
   }
 
   await logoutAllSessions(account);
-  clearRefreshTokenCookie(res);
+  clearRefreshTokenCookie(res, account.type);
   sendSuccess(res, 200, "Logged out from all sessions");
 });
 

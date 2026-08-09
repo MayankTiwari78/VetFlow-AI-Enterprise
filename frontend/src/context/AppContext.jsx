@@ -27,6 +27,7 @@ const AppContextProvider = ({ children }) => {
   const initialDoctorLoadStarted = useRef(false);
   const profileTokenLoaded = useRef("");
   const tokenRef = useRef("");
+  const doctorFetchCount = useRef(0);
 
   const updateToken = useCallback((nextToken) => {
     const normalizedToken = nextToken || "";
@@ -50,6 +51,11 @@ const AppContextProvider = ({ children }) => {
   }, []);
 
   const getDoctosData = useCallback(async () => {
+    doctorFetchCount.current += 1;
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.log(`[AppContext] getDoctosData called #${doctorFetchCount.current}`);
+    }
     setDoctorsLoading(true);
     setDoctorsError("");
     try {
@@ -153,6 +159,10 @@ const AppContextProvider = ({ children }) => {
   }, [backendUrl, loadUserProfileData, updateToken]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.log("[AppContext] mounted, initial doctor load effect running");
+    }
     if (initialDoctorLoadStarted.current) return;
     initialDoctorLoadStarted.current = true;
     void getDoctosData();

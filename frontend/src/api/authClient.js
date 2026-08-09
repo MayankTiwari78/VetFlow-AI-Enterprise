@@ -27,7 +27,11 @@ const endpointPath = (url = '') => {
 const isLegacyPublicAuthEndpoint = (path = '') =>
   ['/api/user/login', '/api/user/register'].includes(path)
 
-const isRefreshEndpoint = (path = '') => path === '/api/v1/auth/refresh'
+const isRefreshEndpoint = (path = '') =>
+  path === '/api/v1/auth/refresh' ||
+  path === '/api/v1/auth/refresh/patient' ||
+  path === '/api/v1/auth/refresh/doctor' ||
+  path === '/api/v1/auth/refresh/admin'
 
 const isPublicAuthEndpoint = (path = '') =>
   isLegacyPublicAuthEndpoint(path) ||
@@ -101,7 +105,7 @@ const refreshPatientToken = async ({ persist = true, optional = false } = {}) =>
   if (!refreshPromise) {
     refreshPromise = axios
       .post(
-        backendBaseUrl + '/api/v1/auth/refresh',
+        backendBaseUrl + '/api/v1/auth/refresh/patient',
         {},
         { withCredentials: true, skipAuthRefresh: true, optionalAuthRequest: optional }
       )
@@ -220,7 +224,7 @@ export const configurePatientAuth = ({ backendUrl, setToken, onAuthCleared } = {
 export const logoutPatientSession = async (backendUrl) => {
   try {
     await axios.post(
-      backendUrl + '/api/v1/auth/logout',
+      backendUrl + '/api/v1/auth/logout/patient',
       {},
       { withCredentials: true, skipAuthRefresh: true }
     )

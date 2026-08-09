@@ -72,7 +72,7 @@ export const revokeSession: RequestHandler = asyncHandler(async (req, res) => {
   await auditSessionEvent(req, "session.revoked", sessionId);
 
   if (req.authSessionId === sessionId) {
-    clearRefreshTokenCookie(res);
+    clearRefreshTokenCookie(res, req.authAccountType);
   }
 
   sendSuccess(res, 200, "Session revoked");
@@ -99,7 +99,7 @@ export const revokeAllSessions: RequestHandler = asyncHandler(async (req, res) =
   const account = requireAccountContext(req);
   await revokeAllSessionsForAccount(account.accountId, account.accountType, "user-revoked-all");
   await auditSessionEvent(req, "auth.logout_all");
-  clearRefreshTokenCookie(res);
+  clearRefreshTokenCookie(res, req.authAccountType);
   sendSuccess(res, 200, "All sessions revoked");
 });
 

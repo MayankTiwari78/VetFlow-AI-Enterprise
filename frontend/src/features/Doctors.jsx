@@ -15,6 +15,7 @@ import {
 import { AppContext } from '../context/AppContext'
 import { useNavigate, useParams } from '../lib/routerCompat'
 import { normalizeSpeciality, vetSpecialities, cleanVetText } from '../lib/veterinaryDisplay'
+import { loginHrefForReturnTo } from '../lib/authNavigation'
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -61,7 +62,7 @@ const Doctors = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [availableOnly, setAvailableOnly] = useState(false)
 
-  const { doctors, doctorsLoading, doctorsError, getDoctosData, currencySymbol } = useContext(AppContext)
+  const { doctors, doctorsLoading, doctorsError, getDoctosData, currencySymbol, authStatus, token } = useContext(AppContext)
 
   const applyFilter = useMemo(() => {
     const normalizedSelected = speciality ? normalizeSpeciality(speciality) : ''
@@ -347,6 +348,12 @@ const Doctors = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        if (authStatus === 'initializing') {
+                          return
+                        }
+                        if (!token) {
+                          return navigate(loginHrefForReturnTo(`/appointment/${item._id}`))
+                        }
                         navigate(`/appointment/${item._id}`)
                         scrollTo(0, 0)
                       }}
