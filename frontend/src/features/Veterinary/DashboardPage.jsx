@@ -281,7 +281,7 @@ const DashboardPage = () => {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/appointment")}
+          onClick={() => navigate("/pet-owner/veterinarians")}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-soft transition-all duration-200 hover:bg-amber-700"
         >
           Book Now
@@ -427,7 +427,7 @@ const DashboardPage = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate("/appointment")}
+              onClick={() => navigate("/pet-owner/veterinarians")}
               className="mt-4 w-full rounded-xl bg-teal px-4 py-2.5 text-sm font-bold text-white shadow-soft transition-all duration-200 hover:bg-teal/90"
             >
               Book Appointment

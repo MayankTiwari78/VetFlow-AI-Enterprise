@@ -9,7 +9,7 @@ import { useNavigate, useParams } from '../../lib/routerCompat'
 import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
-import { User, Bell, Shield, CreditCard, Globe, ChevronRight, KeyRound, Smartphone, Monitor, History, CheckCircle2 } from 'lucide-react'
+import { User, Bell, Shield, CreditCard, Globe, ChevronRight, KeyRound, Smartphone, Monitor, History, CheckCircle2, Sparkles, FileText, PawPrint, Settings } from 'lucide-react'
 
 const petDraft = {
   name: '',
@@ -422,6 +422,15 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [selectedPetInList, setSelectedPetInList] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [settingsTab, setSettingsTab] = useState('profile')
+  const [billingModal, setBillingModal] = useState('')
+  const [preferences, setPreferences] = useState({
+    language: 'English (India)',
+    timezone: 'India Standard Time (IST)',
+    timezoneValue: 'Asia/Kolkata',
+    defaultPet: '',
+    units: 'Metric (kg, °C)'
+  })
+  const [prefModal, setPrefModal] = useState('')
   const [notificationPrefs, setNotificationPrefs] = useState({
     vaccinationReminders: true,
     appointmentConfirmations: true,
@@ -529,6 +538,13 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
     }
   }, [view, pets, selectedPetInList])
 
+  useEffect(() => {
+    if (pets.length && !preferences.defaultPet) {
+      const firstPet = pets[0]
+      setPreferences((prev) => ({ ...prev, defaultPet: firstPet.name || getId(firstPet) }))
+    }
+  }, [pets, preferences.defaultPet])
+
   const submitSearch = async (event) => {
     event.preventDefault()
     setLoading(true)
@@ -610,6 +626,11 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const saveNotificationPrefs = (event) => {
     event.preventDefault()
     toast.success('Notification preferences saved')
+  }
+
+  const savePreferences = (event) => {
+    event.preventDefault()
+    toast.success('Preferences saved successfully')
   }
 
   // ---- Security (reuses existing backend APIs; see backend authRoutes) ----
@@ -752,10 +773,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
     }
   }, [view, settingsTab, token])
 
-  const placeholderSections = {
-    billing: { title: 'Billing & Plan', desc: 'Subscription, invoices, payment' },
-    preferences: { title: 'Preferences', desc: 'Language, timezone, appearance' }
-  }
+  const placeholderSections = {}
 
   if (authStatus === 'initializing' || (!token && authStatus !== 'authenticated')) return <Skeleton />
   if (loading) return <Skeleton />
@@ -894,7 +912,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
           pets={pets}
           records={records}
           onMyPets={() => navigate('/pet-owner/pets')}
-          onBrowseVets={() => navigate('/doctors')}
+          onBrowseVets={() => navigate('/pet-owner/veterinarians')}
           onRegisterPet={() => navigate('/pet-owner/pets/register')}
         />
       )}
@@ -1228,7 +1246,208 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                     Login history is not yet available — the backend does not currently expose an authentication-log endpoint.
                   </p>
                 </div>
+
+                {/* Save changes */}
+                <div className='mt-6 border-t border-line/70 pt-5'>
+                  <button
+                    type='button'
+                    onClick={() => toast.success('Security settings saved')}
+                    className='mf-button !px-8 !py-3 text-sm'
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
+            )}
+
+            {settingsTab === 'billing' && (
+              <div className='rounded-2xl border border-line/70 bg-white p-6 shadow-soft sm:p-8'>
+                {/* Header */}
+                <div>
+                  <h2 className='text-xl font-bold text-ink'>Billing & Plan</h2>
+                  <p className='mt-1 text-sm text-muted'>Subscription, invoices, payment</p>
+                </div>
+
+                {/* Current Plan Card */}
+                <div className='mt-6 rounded-2xl border border-white/20 bg-[linear-gradient(135deg,#0FAE9B_0%,#16B8A5_50%,#20C7AD_100%)] p-6 shadow-soft'>
+                  <div className='flex items-center gap-2.5'>
+                    <span className='grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20 text-white'>
+                      <CreditCard className='h-5 w-5' />
+                    </span>
+                    <p className='text-xs font-black uppercase tracking-[0.12em] text-white'>Current Plan</p>
+                  </div>
+                  <div className='mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center'>
+                    <div>
+                      <h3 className='text-2xl font-black text-white'>MedFlow AI Pro</h3>
+                      <p className='mt-1 text-sm text-white/70'>Unlimited pets · AI reports · Priority support</p>
+                      <p className='mt-3 text-3xl font-black text-white'>
+                        ₹1,699<span className='text-base font-semibold text-white/70'> / month</span>
+                      </p>
+                    </div>
+                    <div className='text-right'>
+                      <span className='inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-xs font-bold text-white'>
+                        <CheckCircle2 className='h-3.5 w-3.5' />
+                        Active
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action rows */}
+                <div className='mt-6 divide-y divide-line/70 overflow-hidden rounded-2xl border border-line/70'>
+                  <button
+                    type='button'
+                    onClick={() => toast.info('Subscription checkout is currently unavailable')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <Sparkles className='h-5 w-5 text-primary' />
+                      <span>Upgrade Plan</span>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => toast.info('Payment method management is currently unavailable')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <CreditCard className='h-5 w-5 text-primary' />
+                      <span>Update Payment Method</span>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => toast.info('Invoice history is currently unavailable')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <FileText className='h-5 w-5 text-primary' />
+                      <span>View Invoices</span>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => setBillingModal('cancel')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-red-600 transition-colors hover:bg-red-50'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <Shield className='h-5 w-5 text-red-600' />
+                      <span>Cancel Subscription</span>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-red-400' />
+                  </button>
+                </div>
+
+                {/* Save Changes */}
+                <div className='mt-6 border-t border-line/70 pt-5'>
+                  <button
+                    type='button'
+                    onClick={() => toast.success('Billing settings saved')}
+                    className='mf-button !px-8 !py-3 text-sm'
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {settingsTab === 'preferences' && (
+              <form onSubmit={savePreferences} className='rounded-2xl border border-line/70 bg-white p-6 shadow-soft sm:p-8'>
+                {/* Header */}
+                <div>
+                  <h2 className='text-xl font-bold text-ink'>Preferences</h2>
+                  <p className='mt-1 text-sm text-muted'>Language, timezone, appearance</p>
+                </div>
+
+                {/* Preference rows */}
+                <div className='mt-6 divide-y divide-line/70 overflow-hidden rounded-2xl border border-line/70'>
+                  {/* Language */}
+                  <button
+                    type='button'
+                    onClick={() => setPrefModal('language')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <span className='grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'>
+                        <Globe className='h-5 w-5' />
+                      </span>
+                      <div>
+                        <p className='text-sm font-bold text-ink'>Language</p>
+                        <p className='mt-0.5 text-sm text-muted'>{preferences.language}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+
+                  {/* Timezone */}
+                  <button
+                    type='button'
+                    onClick={() => setPrefModal('timezone')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <span className='grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'>
+                        <Globe className='h-5 w-5' />
+                      </span>
+                      <div>
+                        <p className='text-sm font-bold text-ink'>Timezone</p>
+                        <p className='mt-0.5 text-sm text-muted'>{preferences.timezone}</p>
+                        <p className='mt-0.5 text-xs text-muted'>{preferences.timezoneValue}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+
+                  {/* Default Pet */}
+                  <button
+                    type='button'
+                    onClick={() => setPrefModal('defaultPet')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <span className='grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'>
+                        <PawPrint className='h-5 w-5' />
+                      </span>
+                      <div>
+                        <p className='text-sm font-bold text-ink'>Default Pet</p>
+                        <p className='mt-0.5 text-sm text-muted'>{preferences.defaultPet || 'Not set'}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+
+                  {/* Units */}
+                  <button
+                    type='button'
+                    onClick={() => setPrefModal('units')}
+                    className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-mist'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <span className='grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal/10 text-teal'>
+                        <Settings className='h-5 w-5' />
+                      </span>
+                      <div>
+                        <p className='text-sm font-bold text-ink'>Units</p>
+                        <p className='mt-0.5 text-sm text-muted'>{preferences.units}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className='h-4 w-4 text-muted' />
+                  </button>
+                </div>
+
+                {/* Save Changes */}
+                <div className='mt-6 border-t border-line/70 pt-5'>
+                  <button
+                    type='submit'
+                    className='mf-button !px-8 !py-3 text-sm'
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
             )}
 
             {placeholderSections[settingsTab] && (
@@ -1238,6 +1457,94 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                 <p className='mt-6 rounded-xl border border-dashed border-line/80 bg-[#F6F9F9] px-4 py-6 text-center text-sm text-muted'>
                   This section is coming soon.
                 </p>
+              </div>
+            )}
+
+            {/* Preferences selection modal */}
+            {prefModal && (
+              <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/40 px-4 py-6'>
+                <div className='mf-card mx-auto w-full max-w-md p-6'>
+                  <h3 className='text-lg font-bold text-ink'>
+                    {prefModal === 'language' ? 'Select Language' : prefModal === 'timezone' ? 'Select Timezone' : prefModal === 'defaultPet' ? 'Select Default Pet' : 'Select Units'}
+                  </h3>
+                  <div className='mt-4 space-y-2'>
+                    {(prefModal === 'language'
+                      ? [{ label: 'English (India)', value: 'English (India)' }, { label: 'English (US)', value: 'English (US)' }]
+                      : prefModal === 'timezone'
+                        ? [{ label: 'India Standard Time (IST)', value: 'India Standard Time (IST)', secondary: 'Asia/Kolkata' }, { label: 'Eastern Standard Time (EST)', value: 'Eastern Standard Time (EST)', secondary: 'America/New_York' }, { label: 'Pacific Standard Time (PST)', value: 'Pacific Standard Time (PST)', secondary: 'America/Los_Angeles' }, { label: 'Central European Time (CET)', value: 'Central European Time (CET)', secondary: 'Europe/Berlin' }, { label: 'Greenwich Mean Time (GMT)', value: 'Greenwich Mean Time (GMT)', secondary: 'Europe/London' }]
+                        : prefModal === 'defaultPet'
+                          ? pets.map((pet) => ({ label: pet.name, value: pet.name || getId(pet) }))
+                          : [{ label: 'Metric (kg, °C)', value: 'Metric (kg, °C)' }, { label: 'Imperial (lb, °F)', value: 'Imperial (lb, °F)' }]
+                    ).map((option) => {
+                      const isSelected = option.value === (
+                        prefModal === 'language' ? preferences.language :
+                        prefModal === 'timezone' ? preferences.timezone :
+                        prefModal === 'defaultPet' ? preferences.defaultPet :
+                        preferences.units
+                      )
+                      return (
+                        <button
+                          key={option.value}
+                          type='button'
+                          onClick={() => {
+                            if (prefModal === 'language') setPreferences((prev) => ({ ...prev, language: option.value }))
+                            else if (prefModal === 'timezone') setPreferences((prev) => ({ ...prev, timezone: option.value, timezoneValue: option.secondary }))
+                            else if (prefModal === 'defaultPet') setPreferences((prev) => ({ ...prev, defaultPet: option.value }))
+                            else if (prefModal === 'units') setPreferences((prev) => ({ ...prev, units: option.value }))
+                            setPrefModal('')
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${isSelected ? 'border-teal bg-teal/10' : 'border-line/70 bg-white hover:bg-mist'}`}
+                        >
+                          <div>
+                            <p className='text-sm font-bold text-ink'>{option.label}</p>
+                            {option.secondary && <p className='text-xs text-muted'>{option.secondary}</p>}
+                          </div>
+                          {isSelected && <CheckCircle2 className='h-4 w-4 text-teal' />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className='mt-4 flex justify-end'>
+                    <button type='button' className='mf-button-secondary !px-5 !py-2 text-sm' onClick={() => setPrefModal('')}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cancel subscription confirmation modal */}
+            {billingModal === 'cancel' && (
+              <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6'>
+                <div className='mf-card mx-auto w-full max-w-md p-6 text-center'>
+                  <div className='mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-600'>
+                    <Shield className='h-6 w-6' />
+                  </div>
+                  <h3 className='text-xl font-bold text-ink'>Cancel Subscription</h3>
+                  <p className='mt-3 text-sm leading-6 text-muted'>
+                    Are you sure you want to cancel your MedFlow AI Pro subscription? You will lose access to premium
+                    features at the end of the current billing period.
+                  </p>
+                  <div className='mt-6 flex justify-center gap-3'>
+                    <button
+                      type='button'
+                      onClick={() => setBillingModal('')}
+                      className='mf-button-secondary !px-6 !py-2.5 text-sm'
+                    >
+                      Keep Subscription
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => {
+                        toast.success('Subscription cancellation requested')
+                        setBillingModal('')
+                      }}
+                      className='rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700'
+                    >
+                      Cancel Subscription
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

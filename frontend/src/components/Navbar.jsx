@@ -1,4 +1,5 @@
 import { useContext, useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { NavLink, useNavigate } from '../lib/routerCompat'
 import { AppContext } from '../context/AppContext'
 import { logoutPatientSession } from '../api/authClient'
@@ -7,10 +8,14 @@ import { Menu, X, ChevronDown, LogOut, User, Heart, Calendar, Shield, PawPrint, 
 
 const Navbar = () => {
   const navigate = useNavigate()
+  const pathname = usePathname()
   const [showMenu, setShowMenu] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const { token, setToken, userData, backendUrl } = useContext(AppContext)
+
+  // On the Veterinarians browsing section, do not expose the Pet Owner dashboard menu.
+  const isVeterinariansPage = Boolean(pathname) && (pathname === '/doctors' || pathname.startsWith('/doctors/'))
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20)
@@ -49,7 +54,7 @@ const Navbar = () => {
         </ul>
 
         <div className='flex items-center gap-2 sm:gap-3'>
-          {token && userData ? (
+          {token && userData && !isVeterinariansPage ? (
             <div className='relative'>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
@@ -126,7 +131,7 @@ const Navbar = () => {
             </NavLink>
           ))}
           <hr className='my-3 border-line/60' />
-          {token && (
+          {token && !isVeterinariansPage && (
             <>
               <NavLink onClick={() => setShowMenu(false)} to='/dashboard'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Dashboard</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/pet-owner/pets'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>My Pets</p></NavLink>
@@ -136,7 +141,7 @@ const Navbar = () => {
             </>
           )}
           <div className='mt-4 px-4'>
-            {token ? (
+            {token && !isVeterinariansPage ? (
               <button onClick={logout} className='mf-button w-full'>Log out</button>
             ) : (
               <div className='grid gap-3'>

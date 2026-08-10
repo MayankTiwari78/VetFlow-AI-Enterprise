@@ -324,7 +324,7 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
   };
 
   const handleBookAppointment = () => {
-    navigate("/appointment");
+    navigate("/pet-owner/appointments");
   };
 
   return (

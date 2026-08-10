@@ -31,7 +31,7 @@ const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pet-owner/pets", label: "My Pets", icon: PawPrint },
   { to: "/pet-owner/appointments", label: "Appointments", icon: Calendar },
-  { to: "/doctors", label: "Veterinarians", icon: Stethoscope },
+  { to: "/pet-owner/veterinarians", label: "Veterinarians", icon: Stethoscope },
   { to: "/pet-owner/medical-history", label: "Medical History", icon: FileText },
   { to: "/pet-owner/ai-reports", label: "AI Health Reports", icon: Brain },
   { to: "/pet-owner/profile", label: "Settings", icon: Settings }
@@ -41,7 +41,7 @@ const routeMeta = [
   { match: "/dashboard", title: "Dashboard", subtitle: "Overview of your pets' health" },
   { match: "/pet-owner/pets", title: "My Pets", subtitle: "Manage your pets' profiles and health records" },
   { match: "/pet-owner/appointments", title: "Appointments", subtitle: "Manage your veterinary appointments" },
-  { match: "/doctors", title: "Veterinarians", subtitle: "Find and connect with certified veterinarians" },
+  { match: "/pet-owner/veterinarians", title: "Veterinarians", subtitle: "Find and connect with certified veterinarians" },
   { match: "/pet-owner/medical-history", title: "Medical History", subtitle: "Complete timeline of your pets' medical records" },
   { match: "/pet-owner/ai-reports", title: "AI Health Reports", subtitle: "AI-powered preliminary health assessments" },
   { match: "/pet-owner/profile", title: "Settings", subtitle: "Manage your profile and preferences" }
@@ -242,7 +242,7 @@ const DashboardLayout = ({ children }) => {
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => navigate("/appointment")}
+              onClick={() => navigate("/pet-owner/appointments")}
               className="inline-flex items-center gap-2 rounded-xl bg-teal px-3 py-2.5 text-sm font-bold text-white shadow-soft transition-all duration-200 hover:bg-teal/90 sm:px-4"
             >
               <Plus className="h-4 w-4" />
@@ -261,25 +261,55 @@ const DashboardLayout = ({ children }) => {
 
             {/* Profile dropdown */}
             <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                ref={triggerRef}
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-mist"
-                aria-expanded={showDropdown}
-                aria-haspopup="menu"
+              <div
+                className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-mist"
+                onClick={() => navigate("/pet-owner/profile")}
               >
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-teal/15 text-sm font-bold text-teal">
                   {avatarInitial}
                 </div>
                 <span className="hidden text-sm font-bold text-ink md:block">{firstName}</span>
-                <ChevronDown
-                  className={`hidden h-4 w-4 text-muted transition-transform duration-200 md:block ${
-                    showDropdown ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+                <button
+                  type="button"
+                  ref={triggerRef}
+                  onClick={(e) => { e.stopPropagation(); setShowDropdown(!showDropdown); }}
+                  className="ml-1 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-mist hover:text-ink"
+                  aria-expanded={showDropdown}
+                  aria-haspopup="menu"
+                  aria-label="Account menu"
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted transition-transform duration-200 md:block ${
+                      showDropdown ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
 
+              {showDropdown && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
+                  <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border border-line/60 bg-white p-2 shadow-soft-xl animate-fade-in-down">
+                    <div className="mb-2 border-b border-line/60 px-3 py-3">
+                      <p className="text-sm font-semibold text-ink">{firstName}</p>
+                      <p className="text-xs text-muted">{email}</p>
+                    </div>
+                    <div className="space-y-1">
+                      {dropdownItems.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => { navigate(item.to); setShowDropdown(false); }}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted transition-all duration-200 hover:bg-primary/5 hover:text-ink"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
