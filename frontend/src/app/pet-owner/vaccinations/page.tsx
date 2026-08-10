@@ -1,12 +1,12 @@
 "use client";
 
 import DashboardLayout from "../../../features/Veterinary/DashboardLayout";
-import PetOwnerDashboard from "../../../features/Veterinary/PetOwnerDashboard";
+import VaccinationDashboard from "../../../features/Veterinary/VaccinationDashboard";
 
-export default function PetVaccinationsPage() {
+export default function PetOwnerVaccinationsPage() {
   return (
     <DashboardLayout>
-      <PetOwnerDashboard view="vaccinations" />
+      <VaccinationDashboard />
     </DashboardLayout>
   );
 }

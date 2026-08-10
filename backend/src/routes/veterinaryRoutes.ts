@@ -14,6 +14,7 @@ import {
   deleteVaccinationRecord,
   deleteVeterinarianProfile,
   medicalRecordById,
+  overdueVaccinations,
   petById,
   petMedicalHistory,
   petOwnerProfile,
@@ -24,11 +25,14 @@ import {
   searchPetOwnerProfiles,
   searchPets,
   searchVeterinarians,
+  upcomingVaccinations,
   updateMedicalRecord,
   updatePetOwner,
   updatePetProfile,
   updateVaccinationRecord,
   updateVeterinarianProfile,
+  vaccinationById,
+  vaccinationStats,
   veterinaryDashboardStats,
   veterinaryDashboardSummary,
   veterinarianById,
@@ -184,6 +188,24 @@ veterinaryRouter.post(
   validateRequest({ body: vaccinationCreateSchema }),
   createVaccination
 );
+veterinaryRouter.get(
+  "/vaccinations/upcoming",
+  authAny,
+  validateRequest({ query: vaccinationQuerySchema }),
+  upcomingVaccinations
+);
+veterinaryRouter.get(
+  "/vaccinations/overdue",
+  authAny,
+  validateRequest({ query: vaccinationQuerySchema }),
+  overdueVaccinations
+);
+veterinaryRouter.get(
+  "/vaccinations/:vaccinationId",
+  authAny,
+  validateRequest({ params: vaccinationIdParamSchema }),
+  vaccinationById
+);
 veterinaryRouter.patch(
   "/vaccinations/:vaccinationId",
   authAny,
@@ -201,6 +223,12 @@ veterinaryRouter.get(
   authAny,
   validateRequest({ params: petIdParamSchema, query: vaccinationQuerySchema }),
   petVaccinations
+);
+veterinaryRouter.get(
+  "/pets/:petId/vaccinations/stats",
+  authAny,
+  validateRequest({ params: petIdParamSchema }),
+  vaccinationStats
 );
 
 veterinaryRouter.post(

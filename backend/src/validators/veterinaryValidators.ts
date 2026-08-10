@@ -121,11 +121,19 @@ export const veterinarianUpdateSchema = veterinarianCreateSchema
 export const vaccinationCreateSchema = z.object({
   petId: objectIdSchema,
   vaccineName: boundedText(160),
+  category: z.string().trim().max(80).default("Core"),
   dueDate: z.coerce.date(),
   completedDate: optionalDateSchema,
   nextDose: optionalDateSchema,
+  dose: z.string().trim().max(80).default(""),
+  route: z.string().trim().max(80).default(""),
   veterinarian: objectIdSchema.optional(),
-  notes: z.string().trim().max(2000).default("")
+  clinic: z.string().trim().max(180).default(""),
+  manufacturer: z.string().trim().max(160).default(""),
+  batchNumber: z.string().trim().max(120).default(""),
+  certificate: z.string().trim().max(2000).default(""),
+  notes: z.string().trim().max(2000).default(""),
+  status: z.enum(["up-to-date", "due-soon", "overdue", "completed", "cancelled"]).default("up-to-date")
 });
 
 export const vaccinationUpdateSchema = vaccinationCreateSchema

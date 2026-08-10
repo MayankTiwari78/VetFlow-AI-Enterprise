@@ -55,11 +55,19 @@ type VeterinarianPayload = {
 type VaccinationPayload = {
   petId: string;
   vaccineName: string;
+  category?: string;
   dueDate: Date;
   completedDate?: Date;
   nextDose?: Date;
+  dose?: string;
+  route?: string;
   veterinarian?: string;
-  notes: string;
+  clinic?: string;
+  manufacturer?: string;
+  batchNumber?: string;
+  certificate?: string;
+  notes?: string;
+  status?: string;
 };
 
 type PetMedicalRecordPayload = {
@@ -164,22 +172,33 @@ const paginate = async <T>(
       sort: (sort: Record<string, 1 | -1>) => {
         skip: (skip: number) => { limit: (limit: number) => Promise<T[]> };
       };
+      populate: (path: string, select?: string) => unknown;
     };
     countDocuments: (filter: Record<string, unknown>) => Promise<number>;
   },
   filter: Record<string, unknown>,
   query: ListingQuery,
   allowedSortFields: readonly string[],
-  fallbackSort = "-createdAt"
+  fallbackSort = "-createdAt",
+  populate?:
+    | string
+    | { path: string; populate?: { path: string; select?: string } }
+    | Array<string | { path: string; populate?: { path: string; select?: string } }>
 ): Promise<PaginatedResult<T>> => {
   const options = listOptions(query);
   const skip = (options.page - 1) * options.limit;
+  let queryBuilder = model
+    .find(filter)
+    .sort(resolveSort(options.sort, allowedSortFields, fallbackSort))
+    .skip(skip)
+    .limit(options.limit);
+
+  if (populate) {
+    queryBuilder = (queryBuilder as unknown as { populate: (p: typeof populate) => typeof queryBuilder }).populate(populate);
+  }
+
   const [items, total] = await Promise.all([
-    model
-      .find(filter)
-      .sort(resolveSort(options.sort, allowedSortFields, fallbackSort))
-      .skip(skip)
-      .limit(options.limit),
+    queryBuilder,
     model.countDocuments(filter)
   ]);
 
@@ -745,8 +764,15 @@ export const deleteVaccination = async (
     await assertPetAccess(actor, String(vaccination.petId), "manage");
   }
 
-  await VaccinationModel.deleteOne({ _id: vaccinationId });
+  await VaccinationModel.findByIdAndUpdate(vaccinationId, { isDeleted: true });
 };
+
+const VACCINATION_POPULATE = {
+  path: "veterinarian",
+  populate: { path: "doctorId", select: "name" }
+};
+
+const VACCINATION_PET_POPULATE = { path: "petId", select: "name species breed age" };
 
 export const listVaccinationsByPet = async (
   actor: VeterinaryActor,
@@ -764,7 +790,183 @@ export const listVaccinationsByPet = async (
     mergeFilters(filter, search),
     query,
     ["createdAt", "dueDate", "completedDate", "nextDose", "vaccineName"],
-    "dueDate"
+    "dueDate",
+    VACCINATION_POPULATE
+  );
+};
+
+const computeVaccinationStatus = (vaccination: {
+  status?: string;
+  completedDate?: Date | string | null;
+  dueDate?: Date | string | null;
+  nextDose?: Date | string | null;
+}): string => {
+  if (vaccination.status && vaccination.status !== "up-to-date") {
+    return vaccination.status;
+  }
+
+  const now = new Date();
+  const due = vaccination.dueDate ? new Date(vaccination.dueDate) : null;
+  const completed = vaccination.completedDate ? new Date(vaccination.completedDate) : null;
+  const next = vaccination.nextDose ? new Date(vaccination.nextDose) : null;
+
+  if (completed && due && completed >= due) {
+    return "completed";
+  }
+
+  if (next) {
+    const diffDays = (next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays < 0) return "overdue";
+    if (diffDays <= 7) return "due-soon";
+    return "up-to-date";
+  }
+
+  if (due) {
+    const diffDays = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays < 0) return "overdue";
+    if (diffDays <= 7) return "due-soon";
+    return "up-to-date";
+  }
+
+  return "up-to-date";
+};
+
+const vaccinationScopeFilter = async (
+  actor: VeterinaryActor,
+  petId?: string
+): Promise<Record<string, unknown>> => {
+  const base: Record<string, unknown> = { isDeleted: { $ne: true } };
+  if (petId) {
+    base.petId = petId;
+  }
+
+  if (actor.accountType === "doctor" && !isAdmin(actor)) {
+    base.veterinarian = documentId(await ownVeterinarian(actor));
+  }
+
+  return base;
+};
+
+export const getVaccinationById = async (
+  actor: VeterinaryActor,
+  vaccinationId: string
+): Promise<unknown> => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  const vaccination = await VaccinationModel.findById(vaccinationId)
+    .populate(VACCINATION_POPULATE)
+    .populate(VACCINATION_PET_POPULATE);
+  if (!vaccination || vaccination.isDeleted) {
+    throw new AppError("Vaccination not found", 404);
+  }
+
+  if (actor.accountType === "doctor" && !isAdmin(actor)) {
+    requireAnyPermission(actor, ["appointments:update"]);
+    const veterinarian = await ownVeterinarian(actor);
+    if (String(vaccination.veterinarian) !== documentId(veterinarian)) {
+      throw new AppError("Vaccination not found", 404);
+    }
+  } else {
+    await assertPetAccess(actor, String(vaccination.petId), "read");
+  }
+
+  return vaccination;
+};
+
+export const getVaccinationStats = async (
+  actor: VeterinaryActor,
+  petId: string
+): Promise<Record<string, unknown>> => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  await assertPetAccess(actor, petId, "read");
+  const filter = await vaccinationScopeFilter(actor, petId);
+
+  const [vaccinations, totalPets] = await Promise.all([
+    VaccinationModel.find(filter).sort({ dueDate: 1 }).populate(VACCINATION_POPULATE),
+    PetModel.countDocuments(await petScopeFilter(actor))
+  ]);
+
+  const stats = {
+    total: vaccinations.length,
+    upToDate: 0,
+    dueSoon: 0,
+    overdue: 0,
+    completed: 0,
+    cancelled: 0
+  };
+
+  vaccinations.forEach((vaccination) => {
+    const status = computeVaccinationStatus(vaccination);
+    if (status === "overdue") stats.overdue += 1;
+    else if (status === "due-soon") stats.dueSoon += 1;
+    else if (status === "completed") stats.completed += 1;
+    else if (status === "cancelled") stats.cancelled += 1;
+    else stats.upToDate += 1;
+  });
+
+  const nextDue = vaccinations
+    .filter((v) => computeVaccinationStatus(v) !== "completed" && computeVaccinationStatus(v) !== "cancelled")
+    .sort((a, b) => {
+      const aDate = a.nextDose || a.dueDate;
+      const bDate = b.nextDose || b.dueDate;
+      return new Date(aDate).getTime() - new Date(bDate).getTime();
+    })[0];
+
+  return {
+    ...stats,
+    totalPets,
+    nextDueDate: nextDue ? nextDue.nextDose || nextDue.dueDate : null,
+    nextDueVaccine: nextDue ? nextDue.vaccineName : null,
+    nextDuePetId: nextDue ? String(nextDue.petId) : null
+  };
+};
+
+export const getUpcomingVaccinations = async (
+  actor: VeterinaryActor,
+  query: ListingQuery = {}
+): Promise<PaginatedResult<unknown>> => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  const now = new Date();
+  const filter = await vaccinationScopeFilter(actor);
+  const upcomingFilter = {
+    ...filter,
+    $or: [
+      { dueDate: { $gte: now } },
+      { nextDose: { $gte: now } }
+    ]
+  };
+  const search = textSearch(listOptions(query).search, ["vaccineName", "notes"]);
+  return paginate(
+    VaccinationModel,
+    mergeFilters(upcomingFilter, search),
+    query,
+    ["dueDate", "nextDose", "createdAt", "vaccineName"],
+    "dueDate",
+    [VACCINATION_POPULATE, VACCINATION_PET_POPULATE]
+  );
+};
+
+export const getOverdueVaccinations = async (
+  actor: VeterinaryActor,
+  query: ListingQuery = {}
+): Promise<PaginatedResult<unknown>> => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  const now = new Date();
+  const filter = await vaccinationScopeFilter(actor);
+  const overdueFilter = {
+    ...filter,
+    $or: [
+      { dueDate: { $lt: now }, completedDate: { $exists: false } },
+      { nextDose: { $lt: now }, completedDate: { $exists: false } }
+    ]
+  };
+  const search = textSearch(listOptions(query).search, ["vaccineName", "notes"]);
+  return paginate(
+    VaccinationModel,
+    mergeFilters(overdueFilter, search),
+    query,
+    ["dueDate", "nextDose", "createdAt", "vaccineName"],
+    "dueDate",
+    [VACCINATION_POPULATE, VACCINATION_PET_POPULATE]
   );
 };
 
@@ -1002,7 +1204,8 @@ export const getVeterinaryDashboardSummary = async (
       mergeFilters(scopedPetFilter, veterinarian ? { veterinarian: documentId(veterinarian) } : {})
     )
       .sort({ dueDate: 1, createdAt: -1 })
-      .limit(10),
+      .limit(10)
+      .populate(VACCINATION_POPULATE),
     AIReportModel.find(scopedPetFilter).sort({ generatedAt: -1 }).limit(10)
   ]);
 

@@ -15,10 +15,14 @@ import {
   deleteVaccination,
   deleteVeterinarian,
   getAiReportById,
+  getOverdueVaccinations,
   getPetById,
   getPetHistory,
   getPetMedicalRecordById,
   getPetOwnerProfile,
+  getUpcomingVaccinations,
+  getVaccinationById,
+  getVaccinationStats,
   getVeterinaryDashboardStats,
   getVeterinaryDashboardSummary,
   getVeterinarianById,
@@ -230,6 +234,38 @@ export const petVaccinations: RequestHandler = asyncHandler(async (req, res) => 
     req.query as Parameters<typeof listVaccinationsByPet>[2]
   );
   sendSuccess(res, 200, "Vaccinations loaded", listPayload("vaccinations", vaccinations));
+});
+
+export const vaccinationStats: RequestHandler = asyncHandler(async (req, res) => {
+  const stats = await getVaccinationStats(
+    veterinaryActorFromRequest(req),
+    req.params.petId as string
+  );
+  sendSuccess(res, 200, "Vaccination statistics loaded", { stats });
+});
+
+export const vaccinationById: RequestHandler = asyncHandler(async (req, res) => {
+  const vaccination = await getVaccinationById(
+    veterinaryActorFromRequest(req),
+    req.params.vaccinationId as string
+  );
+  sendSuccess(res, 200, "Vaccination loaded", { vaccination });
+});
+
+export const upcomingVaccinations: RequestHandler = asyncHandler(async (req, res) => {
+  const vaccinations = await getUpcomingVaccinations(
+    veterinaryActorFromRequest(req),
+    req.query as Parameters<typeof getUpcomingVaccinations>[1]
+  );
+  sendSuccess(res, 200, "Upcoming vaccinations loaded", listPayload("vaccinations", vaccinations));
+});
+
+export const overdueVaccinations: RequestHandler = asyncHandler(async (req, res) => {
+  const vaccinations = await getOverdueVaccinations(
+    veterinaryActorFromRequest(req),
+    req.query as Parameters<typeof getOverdueVaccinations>[1]
+  );
+  sendSuccess(res, 200, "Overdue vaccinations loaded", listPayload("vaccinations", vaccinations));
 });
 
 export const createMedicalRecord: RequestHandler = asyncHandler(async (req, res) => {

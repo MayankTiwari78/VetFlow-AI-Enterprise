@@ -7,6 +7,7 @@ import {
   PawPrint,
   Calendar,
   Stethoscope,
+  Syringe,
   FileText,
   Brain,
   Settings,
@@ -15,7 +16,6 @@ import {
   LogOut,
   Plus,
   Activity,
-  AlertTriangle,
   User,
   Menu,
   X,
@@ -32,6 +32,7 @@ const navItems = [
   { to: "/pet-owner/pets", label: "My Pets", icon: PawPrint },
   { to: "/pet-owner/appointments", label: "Appointments", icon: Calendar },
   { to: "/pet-owner/veterinarians", label: "Veterinarians", icon: Stethoscope },
+  { to: "/pet-owner/vaccinations", label: "Vaccinations", icon: Syringe },
   { to: "/pet-owner/medical-history", label: "Medical History", icon: FileText },
   { to: "/pet-owner/ai-reports", label: "AI Health Reports", icon: Brain },
   { to: "/pet-owner/profile", label: "Settings", icon: Settings }
@@ -42,6 +43,7 @@ const routeMeta = [
   { match: "/pet-owner/pets", title: "My Pets", subtitle: "Manage your pets' profiles and health records" },
   { match: "/pet-owner/appointments", title: "Appointments", subtitle: "Manage your veterinary appointments" },
   { match: "/pet-owner/veterinarians", title: "Veterinarians", subtitle: "Find and connect with certified veterinarians" },
+  { match: "/pet-owner/vaccinations", title: "Vaccinations", subtitle: "Track and manage your pets' vaccination records" },
   { match: "/pet-owner/medical-history", title: "Medical History", subtitle: "Complete timeline of your pets' medical records" },
   { match: "/pet-owner/ai-reports", title: "AI Health Reports", subtitle: "AI-powered preliminary health assessments" },
   { match: "/pet-owner/profile", title: "Settings", subtitle: "Manage your profile and preferences" }
@@ -181,21 +183,28 @@ const DashboardLayout = ({ children }) => {
         </nav>
 
         {/* AI Health Monitor Card */}
-        <div className="mx-3 mb-4 rounded-2xl border border-amber-200/70 bg-amber-50/80 p-4">
+        <div className="mx-3 mb-4 rounded-2xl border border-white/20 bg-[linear-gradient(135deg,#0FAE9B_0%,#16B8A5_50%,#20C7AD_100%)] p-4 shadow-soft">
           <div className="flex items-start gap-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700">
-              <AlertTriangle className="h-4 w-4" />
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/20 text-white">
+              <Activity className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-xs font-bold text-amber-900">AI Health Monitor</p>
-              <p className="mt-1 text-[11px] leading-4 text-amber-800/80">
+              <p className="text-xs font-bold text-white">AI Health Monitor</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/80">
                 Your pet's health needs attention
               </p>
             </div>
           </div>
-          <p className="mt-2.5 rounded-lg bg-white/70 px-3 py-2 text-[11px] font-semibold text-amber-800">
+          <p className="mt-2.5 rounded-lg bg-white/15 px-3 py-2 text-[11px] font-semibold text-white">
             Luna — FeLV vaccine overdue
           </p>
+          <button
+            type="button"
+            onClick={() => navigate("/pet-owner/appointments")}
+            className="mt-3 w-full rounded-lg bg-white/20 px-3 py-2 text-[11px] font-bold text-white transition-colors hover:bg-white/30"
+          >
+            Book Now
+          </button>
         </div>
 
         {/* User section */}

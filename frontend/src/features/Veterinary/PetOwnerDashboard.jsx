@@ -57,6 +57,25 @@ const formatDate = (value) => {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+const loadSaved = (key, fallback) => {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+const saveState = (key, value) => {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // ignore storage errors
+  }
+}
+
 const PetImage = ({ src, alt, className, fallbackClassName, size = 'md' }) => {
   const [imgError, setImgError] = useState(false)
   const initial = String(alt || 'P').charAt(0).toUpperCase()
@@ -423,6 +442,19 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [activeTab, setActiveTab] = useState('overview')
   const [settingsTab, setSettingsTab] = useState('profile')
   const [billingModal, setBillingModal] = useState('')
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [confirmUpgrade, setConfirmUpgrade] = useState(null)
+  const [activePlan, setActivePlan] = useState(() => loadSaved('medflow_active_plan', { name: 'MedFlow AI Plus', price: '₹1,699' }))
+  const [selectedPlan, setSelectedPlan] = useState(null)
+  const [paymentMethod, setPaymentMethod] = useState(() => loadSaved('medflow_payment_method', null))
+  const [invoices, setInvoices] = useState(() => loadSaved('medflow_invoices', []))
+  const [paymentForm, setPaymentForm] = useState({ cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' })
+  const [paymentError, setPaymentError] = useState('')
+  const [availablePlans] = useState([
+    { name: 'MedFlow AI Go', price: '₹999', features: 'AI health summaries · Vaccination reminders · Medical timeline' },
+    { name: 'MedFlow AI Plus', price: '₹1,699', features: 'Everything in Go · Unlimited pets · Advanced AI insights' },
+    { name: 'MedFlow AI Pro', price: '₹2,899', features: 'Everything in Plus · Unlimited AI reports · Priority support' }
+  ])
   const [preferences, setPreferences] = useState({
     language: 'English (India)',
     timezone: 'India Standard Time (IST)',
@@ -772,6 +804,68 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       void loadSecurity()
     }
   }, [view, settingsTab, token])
+
+  useEffect(() => {
+    saveState('medflow_active_plan', activePlan)
+  }, [activePlan])
+
+  useEffect(() => {
+    saveState('medflow_payment_method', paymentMethod)
+  }, [paymentMethod])
+
+  useEffect(() => {
+    saveState('medflow_invoices', invoices)
+  }, [invoices])
+
+  const confirmPlanUpgrade = () => {
+    if (!selectedPlan) return
+    setActivePlan({ name: selectedPlan.name, price: selectedPlan.price })
+    const now = new Date()
+    const invoice = {
+      id: `INV-${Date.now()}`,
+      number: `INV-${String(invoices.length + 1).padStart(3, '0')}`,
+      plan: selectedPlan.name,
+      billingDate: now.toISOString(),
+      amount: selectedPlan.price,
+      status: 'Paid'
+    }
+    setInvoices((prev) => [invoice, ...prev])
+    setConfirmUpgrade(null)
+    setSelectedPlan(null)
+    setUpgradeModalOpen(false)
+    toast.success('Plan upgraded successfully.')
+  }
+
+  const savePaymentMethod = (event) => {
+    event.preventDefault()
+    const { cardholderName, cardNumber, expiryDate, cvv } = paymentForm
+    if (!cardholderName.trim() || !cardNumber.trim() || !expiryDate.trim() || !cvv.trim()) {
+      setPaymentError('Please fill in all payment fields.')
+      return
+    }
+    const digits = cardNumber.replace(/\D/g, '')
+    if (digits.length < 12) {
+      setPaymentError('Please enter a valid card number.')
+      return
+    }
+    if (cvv.length < 3) {
+      setPaymentError('Please enter a valid CVV.')
+      return
+    }
+    const brand = digits.startsWith('4') ? 'Visa' : digits.startsWith('5') ? 'Mastercard' : digits.startsWith('3') ? 'Amex' : 'Card'
+    const last4 = digits.slice(-4)
+    const [month, year] = expiryDate.split('/')
+    setPaymentMethod({
+      brand,
+      last4,
+      expiryMonth: month,
+      expiryYear: year
+    })
+    setPaymentForm({ cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' })
+    setPaymentError('')
+    setBillingModal('')
+    toast.success('Payment method updated successfully.')
+  }
 
   const placeholderSections = {}
 
@@ -1278,11 +1372,16 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                   </div>
                   <div className='mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center'>
                     <div>
-                      <h3 className='text-2xl font-black text-white'>MedFlow AI Pro</h3>
+                      <h3 className='text-2xl font-black text-white'>{activePlan.name}</h3>
                       <p className='mt-1 text-sm text-white/70'>Unlimited pets · AI reports · Priority support</p>
                       <p className='mt-3 text-3xl font-black text-white'>
-                        ₹1,699<span className='text-base font-semibold text-white/70'> / month</span>
+                        {activePlan.price}<span className='text-base font-semibold text-white/70'> / month</span>
                       </p>
+                      {paymentMethod && (
+                        <p className='mt-2 text-sm text-white/80'>
+                          {paymentMethod.brand} •••• {paymentMethod.last4} · Expires {paymentMethod.expiryMonth}/{paymentMethod.expiryYear}
+                        </p>
+                      )}
                     </div>
                     <div className='text-right'>
                       <span className='inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-xs font-bold text-white'>
@@ -1297,7 +1396,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                 <div className='mt-6 divide-y divide-line/70 overflow-hidden rounded-2xl border border-line/70'>
                   <button
                     type='button'
-                    onClick={() => toast.info('Subscription checkout is currently unavailable')}
+                    onClick={() => { setSelectedPlan(null); setUpgradeModalOpen(true) }}
                     className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-mist'
                   >
                     <div className='flex items-center gap-3'>
@@ -1308,18 +1407,18 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                   </button>
                   <button
                     type='button'
-                    onClick={() => toast.info('Payment method management is currently unavailable')}
+                    onClick={() => { setPaymentError(''); setPaymentForm({ cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' }); setBillingModal('payment') }}
                     className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-mist'
                   >
                     <div className='flex items-center gap-3'>
                       <CreditCard className='h-5 w-5 text-primary' />
-                      <span>Update Payment Method</span>
+                      <span>{paymentMethod ? 'Update Payment Method' : 'Add Payment Method'}</span>
                     </div>
                     <ChevronRight className='h-4 w-4 text-muted' />
                   </button>
                   <button
                     type='button'
-                    onClick={() => toast.info('Invoice history is currently unavailable')}
+                    onClick={() => setBillingModal('invoices')}
                     className='flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-ink transition-colors hover:bg-mist'
                   >
                     <div className='flex items-center gap-3'>
@@ -1522,7 +1621,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                   </div>
                   <h3 className='text-xl font-bold text-ink'>Cancel Subscription</h3>
                   <p className='mt-3 text-sm leading-6 text-muted'>
-                    Are you sure you want to cancel your MedFlow AI Pro subscription? You will lose access to premium
+                    Are you sure you want to cancel your {activePlan.name} subscription? You will lose access to premium
                     features at the end of the current billing period.
                   </p>
                   <div className='mt-6 flex justify-center gap-3'>
@@ -1543,6 +1642,179 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                     >
                       Cancel Subscription
                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Upgrade plan selector modal */}
+            {upgradeModalOpen && (
+              <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6'>
+                <div className='mf-card mx-auto w-full max-w-lg p-6'>
+                  <div className='flex items-start justify-between gap-4'>
+                    <div>
+                      <h3 className='text-xl font-bold text-ink'>Upgrade Plan</h3>
+                      <p className='mt-1 text-sm text-muted'>Choose a plan. Your subscription does not change until you confirm.</p>
+                    </div>
+                    <button type='button' className='grid h-9 w-9 place-items-center rounded-md border border-line text-xl text-slate-600' onClick={() => { setUpgradeModalOpen(false); setSelectedPlan(null) }} aria-label='Close modal'>&times;</button>
+                  </div>
+                  <div className='mt-5 space-y-3'>
+                    {availablePlans.map((plan) => {
+                      const isSelected = selectedPlan?.name === plan.name
+                      const isCurrent = plan.name === activePlan.name
+                      return (
+                        <button
+                          key={plan.name}
+                          type='button'
+                          onClick={() => setSelectedPlan(plan)}
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors ${isSelected ? 'border-teal bg-teal/10 ring-2 ring-teal/30' : 'border-line/70 bg-white hover:bg-mist'}`}
+                        >
+                          <div className='min-w-0'>
+                            <p className='text-sm font-bold text-ink'>{plan.name}</p>
+                            <p className='mt-0.5 text-xs text-muted'>{plan.features}</p>
+                            {isCurrent && <span className='mt-1 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700'>Current plan</span>}
+                          </div>
+                          <div className='flex shrink-0 items-center gap-2'>
+                            <span className='text-sm font-black text-ink'>{plan.price}<span className='text-xs font-semibold text-muted'>/mo</span></span>
+                            {isSelected && <CheckCircle2 className='h-4 w-4 text-teal' />}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className='mt-5 flex items-center justify-between gap-3'>
+                    <button type='button' className='mf-button-secondary !px-5 !py-2 text-sm' onClick={() => { setUpgradeModalOpen(false); setSelectedPlan(null) }}>
+                      Cancel
+                    </button>
+                    <button
+                      type='button'
+                      disabled={!selectedPlan}
+                      onClick={() => setConfirmUpgrade(selectedPlan)}
+                      className='mf-button !px-6 !py-2.5 text-sm disabled:opacity-50'
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Confirm upgrade modal */}
+            {confirmUpgrade && (
+              <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6'>
+                <div className='mf-card mx-auto w-full max-w-md p-6 text-center'>
+                  <div className='mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-teal/10 text-teal'>
+                    <Sparkles className='h-6 w-6' />
+                  </div>
+                  <h3 className='text-xl font-bold text-ink'>Confirm Upgrade</h3>
+                  <p className='mt-3 text-sm leading-6 text-muted'>
+                    You are about to upgrade to <span className='font-bold text-ink'>{confirmUpgrade.name}</span> at{' '}
+                    <span className='font-bold text-ink'>{confirmUpgrade.price}</span>/month.
+                  </p>
+                  <div className='mt-4 rounded-xl border border-line/70 bg-[#F6F9F9] px-4 py-3 text-left text-sm'>
+                    <div className='flex items-center justify-between py-1'><span className='text-muted'>Plan</span><span className='font-semibold text-ink'>{confirmUpgrade.name}</span></div>
+                    <div className='flex items-center justify-between py-1'><span className='text-muted'>Price</span><span className='font-semibold text-ink'>{confirmUpgrade.price}</span></div>
+                    <div className='flex items-center justify-between py-1'><span className='text-muted'>Billing cycle</span><span className='font-semibold text-ink'>Monthly</span></div>
+                  </div>
+                  <div className='mt-6 flex justify-center gap-3'>
+                    <button
+                      type='button'
+                      onClick={() => setConfirmUpgrade(null)}
+                      className='mf-button-secondary !px-6 !py-2.5 text-sm'
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type='button'
+                      onClick={confirmPlanUpgrade}
+                      className='mf-button !px-6 !py-2.5 text-sm'
+                    >
+                      Confirm Upgrade
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Payment method modal */}
+            {billingModal === 'payment' && (
+              <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6'>
+                <div className='mf-card mx-auto w-full max-w-md p-6'>
+                  <div className='flex items-start justify-between gap-4'>
+                    <div>
+                      <h3 className='text-xl font-bold text-ink'>Update Payment Method</h3>
+                      <p className='mt-1 text-sm text-muted'>We only store safe payment metadata, never your full card number or CVV.</p>
+                    </div>
+                    <button type='button' className='grid h-9 w-9 place-items-center rounded-md border border-line text-xl text-slate-600' onClick={() => setBillingModal('')} aria-label='Close modal'>&times;</button>
+                  </div>
+                  <form onSubmit={savePaymentMethod} className='mt-5 space-y-4'>
+                    {paymentError && <div role='alert' className='rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{paymentError}</div>}
+                    {paymentMethod && (
+                      <div className='rounded-xl border border-teal/30 bg-teal/5 px-4 py-3 text-sm'>
+                        <p className='font-semibold text-ink'>Current: {paymentMethod.brand} •••• {paymentMethod.last4} · Expires {paymentMethod.expiryMonth}/{paymentMethod.expiryYear}</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className='text-[13px] font-semibold text-ink'>Cardholder Name</label>
+                      <input className='mf-field mt-1.5 !py-3' value={paymentForm.cardholderName} onChange={(e) => setPaymentForm({ ...paymentForm, cardholderName: e.target.value })} placeholder='Name on card' />
+                    </div>
+                    <div>
+                      <label className='text-[13px] font-semibold text-ink'>Card Number</label>
+                      <input className='mf-field mt-1.5 !py-3 font-mono' value={paymentForm.cardNumber} onChange={(e) => setPaymentForm({ ...paymentForm, cardNumber: e.target.value })} placeholder='4242 4242 4242 4242' inputMode='numeric' />
+                    </div>
+                    <div className='grid grid-cols-2 gap-4'>
+                      <div>
+                        <label className='text-[13px] font-semibold text-ink'>Expiry Date</label>
+                        <input className='mf-field mt-1.5 !py-3 font-mono' value={paymentForm.expiryDate} onChange={(e) => setPaymentForm({ ...paymentForm, expiryDate: e.target.value })} placeholder='MM/YY' inputMode='numeric' />
+                      </div>
+                      <div>
+                        <label className='text-[13px] font-semibold text-ink'>CVV</label>
+                        <input className='mf-field mt-1.5 !py-3 font-mono' type='password' value={paymentForm.cvv} onChange={(e) => setPaymentForm({ ...paymentForm, cvv: e.target.value })} placeholder='•••' inputMode='numeric' />
+                      </div>
+                    </div>
+                    <div className='flex justify-end gap-3 pt-2'>
+                      <button type='button' className='mf-button-secondary !px-5 !py-2.5 text-sm' onClick={() => setBillingModal('')}>Cancel</button>
+                      <button type='submit' className='mf-button !px-5 !py-2.5 text-sm'>Save Payment Method</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Invoices modal */}
+            {billingModal === 'invoices' && (
+              <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6'>
+                <div className='mf-card mx-auto w-full max-w-lg p-6'>
+                  <div className='flex items-start justify-between gap-4'>
+                    <div>
+                      <h3 className='text-xl font-bold text-ink'>Invoices</h3>
+                      <p className='mt-1 text-sm text-muted'>Your subscription billing records.</p>
+                    </div>
+                    <button type='button' className='grid h-9 w-9 place-items-center rounded-md border border-line text-xl text-slate-600' onClick={() => setBillingModal('')} aria-label='Close modal'>&times;</button>
+                  </div>
+                  <div className='mt-5 space-y-3'>
+                    {invoices.length === 0 && (
+                      <div className='rounded-xl border border-dashed border-line/80 bg-[#F6F9F9] px-4 py-8 text-center'>
+                        <FileText className='mx-auto h-8 w-8 text-slate-300' />
+                        <p className='mt-3 text-sm font-semibold text-ink'>No invoices yet</p>
+                        <p className='mt-1 text-xs text-muted'>Invoices will appear here after you upgrade your plan.</p>
+                      </div>
+                    )}
+                    {invoices.map((invoice) => (
+                      <div key={invoice.id} className='flex items-center justify-between gap-3 rounded-xl border border-line/70 p-4'>
+                        <div className='min-w-0'>
+                          <p className='text-sm font-bold text-ink'>{invoice.number}</p>
+                          <p className='mt-0.5 text-xs text-muted'>{invoice.plan} · {formatDate(invoice.billingDate)}</p>
+                        </div>
+                        <div className='flex shrink-0 items-center gap-3'>
+                          <span className='text-sm font-black text-ink'>{invoice.amount}</span>
+                          <span className='inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase text-emerald-700'>{invoice.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className='mt-5 flex justify-end'>
+                    <button type='button' className='mf-button-secondary !px-5 !py-2 text-sm' onClick={() => setBillingModal('')}>Close</button>
                   </div>
                 </div>
               </div>

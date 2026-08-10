@@ -6,7 +6,7 @@ import { AppContext } from '../context/AppContext'
 
 const plans = [
   {
-    name: 'Pet Owner',
+    name: 'MedFlow AI Go',
     price: '₹999',
     copy: 'For families managing everyday pet health.',
     features: [
@@ -17,41 +17,41 @@ const plans = [
       'Pet health records',
       'Basic AI health insights'
     ],
-    button: 'Choose Plan',
+    button: 'Choose Go',
     buttonVariant: 'secondary',
     authAction: 'login'
   },
   {
-    name: 'Veterinary Clinic',
-    price: '₹4,999',
-    copy: 'For veterinary teams managing connected digital care.',
+    name: 'MedFlow AI Plus',
+    price: '₹1,699',
+    copy: 'For pet owners who want more AI-powered care.',
     features: [
-      'Clinic-ready medical records',
-      'Pet owner coordination',
-      'Appointment management',
-      'AI-assisted veterinary reports',
-      'Vaccination & treatment tracking',
-      'Priority clinic support'
+      'Everything in Go',
+      'Unlimited pets',
+      'Advanced AI health insights',
+      'Priority appointment booking',
+      'Detailed AI reports',
+      'Email support'
     ],
     featured: true,
     badge: 'Most Popular',
-    button: 'Get Started',
+    button: 'Choose Plus',
     buttonVariant: 'primary',
     authAction: 'register'
   },
   {
-    name: 'Enterprise',
-    price: '₹14,999',
-    copy: 'For multi-location veterinary networks and organizations.',
+    name: 'MedFlow AI Pro',
+    price: '₹2,899',
+    copy: 'For pet owners who need the complete premium experience.',
     features: [
+      'Everything in Plus',
+      'Unlimited AI reports',
+      'Priority support',
       'Advanced analytics',
-      'Multi-clinic management',
-      'Dedicated onboarding',
-      'Configurable workflows',
-      'Advanced AI reporting',
+      'Multi-pet coordination',
       'Premium support'
     ],
-    button: 'Choose Plan',
+    button: 'Choose Pro',
     buttonVariant: 'secondary',
     authAction: 'login'
   }
@@ -60,15 +60,13 @@ const plans = [
 const Pricing = () => {
   const navigate = useNavigate()
   const { authStatus, token } = useContext(AppContext)
-  const [checkoutUnavailable, setCheckoutUnavailable] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState(null)
 
   const isAuthenticated = authStatus === 'authenticated' && Boolean(token)
 
   const handlePlanClick = (plan) => {
     if (isAuthenticated) {
-      // No subscription/checkout backend is implemented yet.
-      // Surface a proper "unavailable" state instead of pretending payment succeeded.
-      setCheckoutUnavailable(true)
+      setSelectedPlan(plan)
       return
     }
     navigate(plan.authAction === 'register' ? '/register' : '/login')
@@ -152,22 +150,22 @@ const Pricing = () => {
         ))}
       </div>
 
-      {/* Subscription checkout unavailable modal */}
-      {checkoutUnavailable && (
+      {/* Plan selected confirmation modal */}
+      {selectedPlan && (
         <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6'>
           <div className='mf-card mx-auto w-full max-w-md p-6 text-center'>
-            <div className='mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-amber-50 text-amber-600'>
-              <Sparkles className='h-6 w-6' />
+            <div className='mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-teal/10 text-teal'>
+              <Check className='h-6 w-6' />
             </div>
-            <h3 className='text-xl font-bold text-ink'>Subscription checkout is currently unavailable</h3>
+            <h3 className='text-xl font-bold text-ink'>{selectedPlan.name} selected</h3>
             <p className='mt-3 text-sm leading-6 text-muted'>
-              Paid subscription checkout is not yet available. Please continue using MedFlow AI and check back soon for
-              plan upgrades.
+              You have selected the {selectedPlan.name} plan at {selectedPlan.price}/month. Subscription checkout is
+              currently unavailable. Please continue using MedFlow AI and check back soon for plan upgrades.
             </p>
             <div className='mt-6 flex justify-center'>
               <button
                 type='button'
-                onClick={() => setCheckoutUnavailable(false)}
+                onClick={() => setSelectedPlan(null)}
                 className='mf-button !px-6 !py-2.5 text-sm'
               >
                 Got it
