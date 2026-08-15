@@ -7,10 +7,10 @@ import {
   PawPrint,
   Calendar,
   Stethoscope,
-  Syringe,
   FileText,
   Brain,
   Settings,
+  Syringe,
   Bell,
   ChevronDown,
   LogOut,
@@ -26,9 +26,10 @@ import {
 import { AppContext } from "../../context/AppContext";
 import { logoutPatientSession } from "../../api/authClient";
 import { useNavigate, Link } from "../../lib/routerCompat";
+import { getProfileImageSrc } from "../../lib/profileImage";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/pet-owner", label: "Dashboard", icon: LayoutDashboard },
   { to: "/pet-owner/pets", label: "My Pets", icon: PawPrint },
   { to: "/pet-owner/appointments", label: "Appointments", icon: Calendar },
   { to: "/pet-owner/veterinarians", label: "Veterinarians", icon: Stethoscope },
@@ -39,30 +40,61 @@ const navItems = [
 ];
 
 const routeMeta = [
-  { match: "/dashboard", title: "Dashboard", subtitle: "Overview of your pets' health" },
   { match: "/pet-owner/pets", title: "My Pets", subtitle: "Manage your pets' profiles and health records" },
   { match: "/pet-owner/appointments", title: "Appointments", subtitle: "Manage your veterinary appointments" },
   { match: "/pet-owner/veterinarians", title: "Veterinarians", subtitle: "Find and connect with certified veterinarians" },
   { match: "/pet-owner/vaccinations", title: "Vaccinations", subtitle: "Track and manage your pets' vaccination records" },
   { match: "/pet-owner/medical-history", title: "Medical History", subtitle: "Complete timeline of your pets' medical records" },
   { match: "/pet-owner/ai-reports", title: "AI Health Reports", subtitle: "AI-powered preliminary health assessments" },
-  { match: "/pet-owner/profile", title: "Settings", subtitle: "Manage your profile and preferences" }
+  { match: "/pet-owner/profile", title: "Settings", subtitle: "Manage your profile and preferences" },
+  { match: "/pet-owner", title: "Dashboard", subtitle: "Overview of your pets' health" }
 ];
 
 const getRouteMeta = (pathname) => {
   const match = routeMeta.find((item) => pathname === item.match || pathname.startsWith(`${item.match}/`));
-  return match || { title: "Dashboard", subtitle: "Overview of your pets' health" };
+  return match || { title: "Dashboard", subtitle: "Overview of your pets' health" }
 };
 
 const dropdownItems = [
   { label: "My Profile", icon: User, to: "/pet-owner/profile" },
   { label: "Health Profile", icon: Heart, to: "/health-profile" },
-  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
+  { label: "Dashboard", icon: LayoutDashboard, to: "/pet-owner" },
   { label: "My Pets", icon: PawPrint, to: "/pet-owner/pets" },
   { label: "Medical Timeline", icon: Clock, to: "/medical-timeline" },
   { label: "My Appointments", icon: Calendar, to: "/pet-owner/appointments" },
   { label: "Security", icon: Shield, to: "/security" }
 ];
+
+const UserAvatar = ({ userData, backendUrl, initial, name, size = "md" }) => {
+  const [imageError, setImageError] = useState(false);
+  const profileImageSrc = getProfileImageSrc(userData, null, backendUrl);
+  const imageSrc = !imageError ? profileImageSrc : "";
+  const sizes = {
+    sm: "h-9 w-9 text-sm",
+    md: "h-10 w-10 text-sm"
+  };
+
+  useEffect(() => {
+    setImageError(false);
+  }, [profileImageSrc]);
+
+  if (imageSrc) {
+    return (
+      <img
+        src={imageSrc}
+        alt={name || "Pet owner"}
+        onError={() => setImageError(true)}
+        className={`${sizes[size] || sizes.md} shrink-0 rounded-full border-2 border-white object-cover shadow-soft ring-1 ring-teal/20`}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sizes[size] || sizes.md} grid shrink-0 place-items-center rounded-full border-2 border-white bg-teal/15 font-bold text-teal shadow-soft ring-1 ring-teal/20`}>
+      {initial}
+    </div>
+  );
+};
 
 const DashboardLayout = ({ children }) => {
   const pathname = usePathname() || "";
@@ -86,7 +118,7 @@ const DashboardLayout = ({ children }) => {
   };
 
   const isActive = (to) => {
-    if (to === "/dashboard") return pathname === "/dashboard";
+    if (to === "/pet-owner") return pathname === "/pet-owner" || pathname === "/dashboard";
     return pathname === to || pathname.startsWith(`${to}/`);
   };
 
@@ -210,9 +242,7 @@ const DashboardLayout = ({ children }) => {
         {/* User section */}
         <div className="border-t border-line/70 px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-teal/15 text-sm font-bold text-teal">
-              {avatarInitial}
-            </div>
+            <UserAvatar userData={userData} backendUrl={backendUrl} initial={avatarInitial} name={firstName} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-ink">{firstName}</p>
               <p className="truncate text-xs text-muted">{email}</p>
@@ -274,9 +304,7 @@ const DashboardLayout = ({ children }) => {
                 className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-mist"
                 onClick={() => navigate("/pet-owner/profile")}
               >
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-teal/15 text-sm font-bold text-teal">
-                  {avatarInitial}
-                </div>
+                <UserAvatar userData={userData} backendUrl={backendUrl} initial={avatarInitial} name={firstName} size="sm" />
                 <span className="hidden text-sm font-bold text-ink md:block">{firstName}</span>
                 <button
                   type="button"
@@ -285,7 +313,6 @@ const DashboardLayout = ({ children }) => {
                   className="ml-1 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-mist hover:text-ink"
                   aria-expanded={showDropdown}
                   aria-haspopup="menu"
-                  aria-label="Account menu"
                 >
                   <ChevronDown
                     className={`h-4 w-4 text-muted transition-transform duration-200 md:block ${

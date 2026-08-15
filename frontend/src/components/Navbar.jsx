@@ -5,6 +5,35 @@ import { AppContext } from '../context/AppContext'
 import { logoutPatientSession } from '../api/authClient'
 import BrandLogo from './BrandLogo'
 import { Menu, X, ChevronDown, LogOut, User, Heart, Calendar, Shield, PawPrint, FileText, LayoutDashboard } from 'lucide-react'
+import { getProfileImageSrc } from '../lib/profileImage'
+
+const UserAvatar = ({ userData, backendUrl }) => {
+  const [imageError, setImageError] = useState(false)
+  const profileImageSrc = getProfileImageSrc(userData, null, backendUrl)
+  const imageSrc = !imageError ? profileImageSrc : ''
+  const initial = String(userData?.name || 'P').charAt(0).toUpperCase()
+
+  useEffect(() => {
+    setImageError(false)
+  }, [profileImageSrc])
+
+  if (imageSrc) {
+    return (
+      <img
+        className='h-9 w-9 rounded-full border-2 border-white object-cover shadow-soft ring-1 ring-primary/20'
+        src={imageSrc}
+        alt='Account'
+        onError={() => setImageError(true)}
+      />
+    )
+  }
+
+  return (
+    <span className='grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-primary/10 text-sm font-bold text-primary shadow-soft ring-1 ring-primary/20'>
+      {initial}
+    </span>
+  )
+}
 
 const Navbar = () => {
   const navigate = useNavigate()
@@ -60,7 +89,7 @@ const Navbar = () => {
                 onClick={() => setShowDropdown(!showDropdown)}
                 className='flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-primary/5 transition-all duration-200'
               >
-                <img className='h-9 w-9 rounded-xl border-2 border-primary/20 object-cover shadow-soft' src={userData.image} alt="Account" />
+                <UserAvatar userData={userData} backendUrl={backendUrl} />
                 <span className='hidden sm:block text-sm font-medium text-ink'>{userData.name?.split(' ')[0]}</span>
                 <ChevronDown className={`h-4 w-4 text-muted transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
               </button>
@@ -74,13 +103,13 @@ const Navbar = () => {
                       <p className='text-xs text-muted'>{userData.email}</p>
                     </div>
                     <div className='space-y-1'>
-                      <button onClick={() => { navigate('/my-profile'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
+                      <button onClick={() => { navigate('/pet-owner/profile'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
                         <User className='h-4 w-4' /> My profile
                       </button>
                       <button onClick={() => { navigate('/health-profile'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
                         <Heart className='h-4 w-4' /> Health profile
                       </button>
-                      <button onClick={() => { navigate('/dashboard'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
+                      <button onClick={() => { navigate('/pet-owner'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
                         <LayoutDashboard className='h-4 w-4' /> Dashboard
                       </button>
                       <button onClick={() => { navigate('/pet-owner/pets'); setShowDropdown(false) }} className='flex items-center gap-3 w-full px-3 py-2.5 text-sm text-muted hover:text-ink hover:bg-primary/5 rounded-xl transition-all duration-200'>
@@ -133,7 +162,7 @@ const Navbar = () => {
           <hr className='my-3 border-line/60' />
           {token && !isVeterinariansPage && (
             <>
-              <NavLink onClick={() => setShowMenu(false)} to='/dashboard'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Dashboard</p></NavLink>
+              <NavLink onClick={() => setShowMenu(false)} to='/pet-owner'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Dashboard</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/pet-owner/pets'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>My Pets</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/health-profile'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Health Profile</p></NavLink>
               <NavLink onClick={() => setShowMenu(false)} to='/medical-timeline'><p className='px-4 py-3 text-lg font-medium text-muted hover:text-primary hover:bg-primary/5 rounded-xl transition-all'>Medical Timeline</p></NavLink>

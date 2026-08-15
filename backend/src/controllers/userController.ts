@@ -3,6 +3,7 @@ import type { RequestHandler } from "express";
 import {
   bookPatientAppointment,
   cancelPatientAppointment,
+  deletePatientProfileImage,
   getPatientHealthProfile,
   getPatientProfile,
   listPatientAppointments,
@@ -75,13 +76,24 @@ export const updateProfile: RequestHandler = asyncHandler(async (req, res) => {
     gender: string;
   };
 
-  await updatePatientProfile(requireUserId(req.authUserId), payload, req.file);
+  const userData = await updatePatientProfile(requireUserId(req.authUserId), payload, req.file);
   await writeAuditLog({
     eventType: "patient.profile.updated",
     ...auditContextFromRequest(req),
     target: { type: "patient", id: requireUserId(req.authUserId) }
   });
-  sendSuccess(res, 200, "Profile Updated");
+  sendSuccess(res, 200, "Profile Updated", { userData }, { userData });
+});
+
+export const deleteProfileImage: RequestHandler = asyncHandler(async (req, res) => {
+  const userId = requireUserId(req.authUserId);
+  const userData = await deletePatientProfileImage(userId);
+  await writeAuditLog({
+    eventType: "patient.profile_image.removed",
+    ...auditContextFromRequest(req),
+    target: { type: "patient", id: userId }
+  });
+  sendSuccess(res, 200, "Profile photo removed", { userData }, { userData });
 });
 
 export const getHealthProfile: RequestHandler = asyncHandler(async (req, res) => {

@@ -6,6 +6,7 @@ import {
   cancelAppointment,
   addFamilyMember,
   deleteFamilyMember,
+  deleteProfileImage,
   familyMembers,
   getHealthProfile,
   getProfile,
@@ -72,6 +73,12 @@ userRouter.post(
   upload.single("image"),
   validateRequest({ body: updateProfileSchema }),
   updateProfile
+);
+userRouter.delete(
+  "/profile-image",
+  authUser,
+  authorizePermissions("users:manage"),
+  deleteProfileImage
 );
 userRouter.post(
   "/book-appointment",

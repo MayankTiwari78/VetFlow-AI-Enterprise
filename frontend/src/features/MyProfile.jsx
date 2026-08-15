@@ -1,16 +1,14 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useState } from 'react'
 import { AppContext } from '../context/AppContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { assets } from '../assets/assets'
 import { isAuthSessionHandledError } from '../api/authClient'
 import { useProtectedPatientRoute } from '../hooks/useProtectedPatientRoute'
+import ProfilePicture from '../components/ProfilePicture'
 
 const MyProfile = () => {
 
     const [isEdit, setIsEdit] = useState(false)
-
-    const [image, setImage] = useState(false)
 
     const { authStatus, token, backendUrl, userData, setUserData, loadUserProfileData } = useContext(AppContext)
     useProtectedPatientRoute({ authStatus, token })
@@ -28,15 +26,12 @@ const MyProfile = () => {
             formData.append('gender', userData.gender)
             formData.append('dob', userData.dob)
 
-            image && formData.append('image', image)
-
             const { data } = await axios.post(backendUrl + '/api/user/update-profile', formData, { headers: { token } })
 
             if (data.success) {
                 toast.success(data.message)
                 await loadUserProfileData()
                 setIsEdit(false)
-                setImage(false)
             } else {
                 toast.error(data.message)
             }
@@ -63,16 +58,13 @@ const MyProfile = () => {
         <div className='mb-7'><p className='mf-eyebrow'>Account settings</p><h1 className='mf-title'>My profile</h1><p className='mf-copy'>Keep your contact and personal details ready for veterinary care coordination.</p></div>
         <div className='mf-card flex flex-col gap-3 p-6 text-sm'>
 
-            {isEdit
-                ? <label htmlFor='image' >
-                    <div className='inline-block relative cursor-pointer'>
-                        <img className='w-32 rounded-md opacity-75' src={image ? URL.createObjectURL(image) : userData.image} alt="Profile preview" />
-                        <img className='w-10 absolute bottom-12 right-12' src={image ? '' : assets.upload_icon} alt="" />
-                    </div>
-                    <input onChange={(e) => setImage(e.target.files[0])} type="file" id="image" hidden />
-                </label>
-                : <img className='w-32 rounded-md bg-mist' src={userData.image} alt="Profile" />
-            }
+            <ProfilePicture
+                backendUrl={backendUrl}
+                token={token}
+                userData={userData}
+                setUserData={setUserData}
+                loadUserProfileData={loadUserProfileData}
+            />
 
             {isEdit
                 ? <input className='mf-field max-w-sm text-2xl font-semibold' type="text" onChange={(e) => setUserData(prev => ({ ...prev, name: e.target.value }))} value={userData.name} />

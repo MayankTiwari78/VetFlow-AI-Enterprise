@@ -1,12 +1,5 @@
-"use client";
-
-import DashboardLayout from "../../features/Veterinary/DashboardLayout";
-import DashboardPage from "../../features/Veterinary/DashboardPage";
+import { redirect } from "next/navigation";
 
 export default function DashboardRoute() {
-  return (
-    <DashboardLayout>
-      <DashboardPage />
-    </DashboardLayout>
-  );
+  redirect("/pet-owner");
 }

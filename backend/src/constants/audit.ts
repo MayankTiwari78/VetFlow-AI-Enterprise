@@ -28,6 +28,7 @@ export const AUDIT_EVENT_TYPES = [
   "doctor.created",
   "patient.health_profile.updated",
   "patient.profile.updated",
+  "patient.profile_image.removed",
   "doctor.availability.updated",
   "appointment.booked",
   "appointment.cancelled",

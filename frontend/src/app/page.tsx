@@ -12,7 +12,7 @@ export default function Page() {
 
   useEffect(() => {
     if (authStatus === "authenticated" && token) {
-      router.replace("/dashboard");
+      router.replace("/pet-owner");
     }
   }, [authStatus, router, token]);
 

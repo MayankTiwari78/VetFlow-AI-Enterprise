@@ -1,4 +1,4 @@
-export const defaultReturnTo = '/dashboard'
+export const defaultReturnTo = '/pet-owner'
 
 const hasControlCharacter = (value) => /[\u0000-\u001F\u007F]/u.test(value)
 

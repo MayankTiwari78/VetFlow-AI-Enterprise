@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useContext } from 'react'
 import { motion } from 'framer-motion'
 import { assets } from '../assets/assets'
 import { ArrowRight, Sparkles, ShieldCheck, CalendarCheck, FileText, Syringe, Star } from 'lucide-react'
 import { Link } from '../lib/routerCompat'
+import { AppContext } from '../context/AppContext'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 22 },
@@ -20,6 +21,8 @@ const floatingCards = [
 ]
 
 const Header = () => {
+  const { userData, token } = useContext(AppContext)
+
   return (
     <section id='home' className='relative isolate overflow-hidden rounded-[36px] border border-white/70 bg-white/50 shadow-soft-xl'>
       <div className='mf-soft-grid absolute inset-0 -z-10 opacity-80' />

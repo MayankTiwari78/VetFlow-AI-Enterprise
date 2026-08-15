@@ -1,12 +1,14 @@
 import axios from 'axios'
-import { useContext, useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 
 import { AppContext } from '../../context/AppContext'
+import { assets } from '../../assets/assets'
 import { isAuthSessionHandledError } from '../../api/authClient'
 import { useProtectedPatientRoute } from '../../hooks/useProtectedPatientRoute'
 import { useNavigate, useParams } from '../../lib/routerCompat'
 import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
+import { getProfileImageSrc, isCustomProfileImage } from '../../lib/profileImage'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
 import { User, Bell, Shield, CreditCard, Globe, ChevronRight, KeyRound, Smartphone, Monitor, History, CheckCircle2, Sparkles, FileText, PawPrint, Settings } from 'lucide-react'
@@ -257,6 +259,8 @@ const authConfig = (token, options = {}) => ({
 })
 
 const unwrap = (responseData, key, fallback) => responseData?.data?.[key] ?? responseData?.[key] ?? fallback
+const readUserDataResponse = (responseData) =>
+  responseData?.userData ?? responseData?.data?.userData ?? null
 
 const Skeleton = () => (
   <div className='space-y-5 py-10'>
@@ -420,7 +424,7 @@ const AiReportCard = ({ report }) => (
 const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const params = useParams()
   const navigate = useNavigate()
-  const { authStatus, backendUrl, token, userData } = useContext(AppContext)
+  const { authStatus, backendUrl, token, userData, setUserData, loadUserProfileData } = useContext(AppContext)
   useProtectedPatientRoute({ authStatus, token })
 
   const [pets, setPets] = useState([])
@@ -437,6 +441,102 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [formError, setFormError] = useState('')
   const [draft, setDraft] = useState(petDraft)
   const [ownerForm, setOwnerForm] = useState(ownerDraft)
+
+  // ---- Profile photo (reuses the existing user upload/delete APIs) ----
+  const ownerFileInputRef = useRef(null)
+  const [ownerPreview, setOwnerPreview] = useState(null)
+  const [ownerSelectedFile, setOwnerSelectedFile] = useState(null)
+  const [ownerPhotoUploading, setOwnerPhotoUploading] = useState(false)
+  const [ownerPhotoDeleting, setOwnerPhotoDeleting] = useState(false)
+  const OWNER_PHOTO_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+  const OWNER_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+  const hasOwnerCustomImage = isCustomProfileImage(userData?.image)
+
+  const handleOwnerFileChange = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!OWNER_PHOTO_ACCEPTED_TYPES.includes(file.type)) {
+      toast.error('Please choose a JPG, PNG, or WEBP image.')
+      return
+    }
+    if (file.size > OWNER_PHOTO_MAX_BYTES) {
+      toast.error('Image is too large. Maximum size is 5MB.')
+      return
+    }
+    setOwnerSelectedFile(file)
+    setOwnerPreview(URL.createObjectURL(file))
+  }
+
+  const handleOwnerPhotoUpload = async () => {
+    if (!ownerPreview || ownerPhotoUploading) return
+    const file = ownerSelectedFile
+    if (!file) return
+    setOwnerPhotoUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('name', userData.name)
+      formData.append('phone', userData.phone)
+      formData.append('address', JSON.stringify(userData.address))
+      formData.append('gender', userData.gender)
+      formData.append('dob', userData.dob)
+      formData.append('image', file)
+      const { data } = await axios.post(`${backendUrl}/api/user/update-profile`, formData, {
+        headers: { token }
+      })
+      if (data.success) {
+        toast.success('Profile photo updated')
+        const nextUserData = readUserDataResponse(data)
+        if (nextUserData) setUserData(nextUserData)
+        else await loadUserProfileData(token)
+        setOwnerPreview(null)
+        setOwnerSelectedFile(null)
+      } else {
+        toast.error(data.message)
+      }
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) {
+        toast.error(
+          requestError.response?.data?.message || requestError.message || 'Unable to upload photo'
+        )
+      }
+    } finally {
+      setOwnerPhotoUploading(false)
+    }
+  }
+
+  const handleOwnerPhotoDelete = async () => {
+    if (ownerPhotoDeleting) return
+    const confirmed = window.confirm(
+      'Remove your profile photo? This will restore the default avatar.'
+    )
+    if (!confirmed) return
+    setOwnerPhotoDeleting(true)
+    try {
+      const { data } = await axios.delete(`${backendUrl}/api/user/profile-image`, {
+        headers: { token }
+      })
+      if (data.success) {
+        toast.success('Profile photo removed')
+        const nextUserData = readUserDataResponse(data)
+        if (nextUserData) setUserData(nextUserData)
+        else await loadUserProfileData(token)
+        setOwnerPreview(null)
+        setOwnerSelectedFile(null)
+      } else {
+        toast.error(data.message)
+      }
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) {
+        toast.error(
+          requestError.response?.data?.message || requestError.message || 'Unable to remove photo'
+        )
+      }
+    } finally {
+      setOwnerPhotoDeleting(false)
+    }
+  }
+
   const [filters, setFilters] = useState({ search: '', species: '', breed: '', gender: '', minAge: '', maxAge: '', minWeight: '', maxWeight: '', vaccinationStatus: '' })
   const [selectedPetInList, setSelectedPetInList] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
@@ -476,6 +576,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
 
   const selectedPetId = params.petId || ''
   const title = pageTitles[view] || pageTitles.dashboard
+  const ownerPhotoSrc = getProfileImageSrc(userData, ownerPreview, backendUrl)
 
   const filteredPets = useMemo(() => pets.filter((pet) => {
     if (filters.gender && pet.gender !== filters.gender) return false
@@ -1058,17 +1159,117 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                   <p className='mt-1 text-sm text-muted'>Update your name, email, and contact details.</p>
                 </div>
 
-                <div className='mt-6 flex flex-col gap-4 rounded-2xl border border-line/70 bg-[#F6F9F9] p-5 sm:flex-row sm:items-center'>
-                  {userData?.image ? (
-                    <img src={userData.image} alt={userData.name || 'Pet owner'} className='h-16 w-16 shrink-0 rounded-full object-cover ring-4 ring-white' />
-                  ) : (
-                    <div className='grid h-16 w-16 shrink-0 place-items-center rounded-full bg-teal/15 text-xl font-bold text-teal ring-4 ring-white'>
-                      {String(userData?.name || 'P').charAt(0).toUpperCase()}
+                <div className='mt-6 rounded-2xl border border-line/70 bg-[#F6F9F9] p-5'>
+                  <div className='flex flex-col gap-5 sm:flex-row sm:items-center'>
+                    <div className='flex shrink-0 flex-col items-center gap-3'>
+                      <div className='relative shrink-0'>
+                        {ownerPhotoSrc ? (
+                          <img
+                            src={ownerPhotoSrc}
+                            alt={userData?.name || 'Pet owner'}
+                            className='h-20 w-20 rounded-full border-4 border-white object-cover shadow-soft-lg ring-1 ring-teal/15'
+                            onError={(event) => {
+                              event.currentTarget.src = assets.profile_pic
+                            }}
+                          />
+                        ) : (
+                          <div className='grid h-20 w-20 place-items-center rounded-full bg-teal/15 text-2xl font-bold text-teal ring-4 ring-white'>
+                            {String(userData?.name || 'P').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <button
+                          type='button'
+                          onClick={() => ownerFileInputRef.current?.click()}
+                          disabled={ownerPhotoUploading || ownerPhotoDeleting}
+                          aria-label='Change profile photo'
+                          className='absolute -bottom-1 -right-1 grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-gradient-to-br from-teal to-emerald-600 text-white shadow-soft transition duration-200 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60'
+                        >
+                          <svg
+                            xmlns='http://www.w3.org/2000/svg'
+                            className='h-4 w-4'
+                            fill='none'
+                            viewBox='0 0 24 24'
+                            stroke='currentColor'
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'
+                            />
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              d='M15 13a3 3 0 11-6 0 3 3 0 016 0z'
+                            />
+                          </svg>
+                        </button>
+                        <input
+                          ref={ownerFileInputRef}
+                          type='file'
+                          accept='image/jpeg,image/png,image/webp'
+                          className='hidden'
+                          onChange={handleOwnerFileChange}
+                        />
+                      </div>
+                      <div className='flex flex-col items-center gap-1.5'>
+                        {(ownerPhotoUploading || ownerPhotoDeleting) && (
+                          <div className='flex items-center gap-1.5 text-xs font-semibold text-muted'>
+                            <span className='h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent' />
+                            {ownerPhotoUploading ? 'Saving…' : 'Removing…'}
+                          </div>
+                        )}
+                        {ownerPreview ? (
+                          <>
+                            <button
+                              type='button'
+                              onClick={handleOwnerPhotoUpload}
+                              disabled={ownerPhotoUploading || ownerPhotoDeleting}
+                              className='mf-button !px-4 !py-1.5 text-xs'
+                            >
+                              Save photo
+                            </button>
+                            <button
+                              type='button'
+                              onClick={() => {
+                                setOwnerPreview(null)
+                                setOwnerSelectedFile(null)
+                                if (ownerFileInputRef.current) ownerFileInputRef.current.value = ''
+                              }}
+                              disabled={ownerPhotoUploading || ownerPhotoDeleting}
+                              className='text-xs font-semibold text-muted hover:text-ink'
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type='button'
+                              onClick={() => ownerFileInputRef.current?.click()}
+                              disabled={ownerPhotoUploading || ownerPhotoDeleting}
+                              className='mf-button-secondary !px-4 !py-1.5 text-xs'
+                            >
+                              {hasOwnerCustomImage ? 'Change photo' : 'Add photo'}
+                            </button>
+                            {hasOwnerCustomImage && (
+                              <button
+                                type='button'
+                                onClick={handleOwnerPhotoDelete}
+                                disabled={ownerPhotoUploading || ownerPhotoDeleting}
+                                className='text-xs font-semibold text-red-600 hover:text-red-700'
+                              >
+                                Remove photo
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <div className='min-w-0'>
-                    <p className='truncate text-base font-bold text-ink'>{userData?.name || 'Pet Owner'}</p>
-                    <p className='mt-0.5 truncate text-sm text-muted'>{userData?.email || 'Not provided'}</p>
+                    <div className='min-w-0 flex-1'>
+                      <p className='truncate text-base font-bold text-ink'>{userData?.name || 'Pet Owner'}</p>
+                      <p className='mt-0.5 truncate text-sm text-muted'>{userData?.email || 'Not provided'}</p>
+                    </div>
                   </div>
                 </div>
 

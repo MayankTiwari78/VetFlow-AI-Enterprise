@@ -15,6 +15,9 @@ import { normalizeDoctors } from "../lib/veterinaryDisplay";
 
 export const AppContext = createContext();
 
+const readUserDataResponse = (responseData) =>
+  responseData?.userData ?? responseData?.data?.userData ?? null;
+
 const AppContextProvider = ({ children }) => {
   const backendUrl = publicEnv.backendUrl;
   const currencySymbol = "INR ";
@@ -95,7 +98,11 @@ const AppContextProvider = ({ children }) => {
         skipAuthRefresh: options.optional
       });
       if (data.success) {
-        setUserData(data.userData);
+        const nextUserData = readUserDataResponse(data);
+        if (!nextUserData) {
+          throw new Error("Profile response did not include userData");
+        }
+        setUserData(nextUserData);
         profileTokenLoaded.current = activeToken;
         return true;
       } else {

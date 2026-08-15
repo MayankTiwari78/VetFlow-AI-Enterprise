@@ -8,6 +8,7 @@ import {
   isFutureSlot,
   sanitizeAppointmentForPatient
 } from "../utils/appointments.js";
+import { DEFAULT_USER_IMAGE } from "../constants/defaults.js";
 import { removeSensitiveFields } from "../utils/sanitize.js";
 import { assertBookableDoctorSlot } from "./availabilityService.js";
 import { uploadImageToCloudinary } from "./uploadService.js";
@@ -136,7 +137,7 @@ export const updatePatientProfile = async (
   userId: string,
   payload: UserUpdatePayload,
   file?: Express.Multer.File
-): Promise<void> => {
+): Promise<unknown> => {
   const update: Partial<User> = {
     name: payload.name,
     phone: payload.phone,
@@ -146,7 +147,9 @@ export const updatePatientProfile = async (
   };
 
   if (file) {
-    update.image = await uploadImageToCloudinary(file.path);
+    update.image = await uploadImageToCloudinary(file.path, {
+      developmentFallbackUrl: DEFAULT_USER_IMAGE
+    });
   }
 
   const updated = await UserModel.findByIdAndUpdate(userId, update, {
@@ -157,6 +160,22 @@ export const updatePatientProfile = async (
   if (!updated) {
     throw new AppError("User not found", 404);
   }
+
+  return removeSensitiveFields(updated);
+};
+
+export const deletePatientProfileImage = async (userId: string): Promise<unknown> => {
+  const updated = await UserModel.findByIdAndUpdate(
+    userId,
+    { image: DEFAULT_USER_IMAGE },
+    { new: true, runValidators: true }
+  );
+
+  if (!updated) {
+    throw new AppError("User not found", 404);
+  }
+
+  return removeSensitiveFields(updated);
 };
 
 export const bookPatientAppointment = async (

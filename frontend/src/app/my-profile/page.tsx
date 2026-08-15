@@ -1,7 +1,5 @@
-"use client";
-
-import MyProfile from "../../features/MyProfile";
+import { redirect } from "next/navigation";
 
 export default function MyProfilePage() {
-  return <MyProfile />;
+  redirect("/pet-owner/profile");
 }
