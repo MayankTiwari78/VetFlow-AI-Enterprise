@@ -78,6 +78,21 @@ const saveState = (key, value) => {
   }
 }
 
+const getPetImageSrc = (pet, backendUrl) => {
+  const image = pet?.profileImage || ''
+  if (!image) return ''
+  if (
+    image.startsWith('data:') ||
+    image.startsWith('blob:') ||
+    image.startsWith('http://') ||
+    image.startsWith('https://')
+  ) {
+    return image
+  }
+  if (!backendUrl || !image.startsWith('/')) return image
+  return `${backendUrl.replace(/\/$/, '')}${image}`
+}
+
 const PetImage = ({ src, alt, className, fallbackClassName, size = 'md' }) => {
   const [imgError, setImgError] = useState(false)
   const initial = String(alt || 'P').charAt(0).toUpperCase()
@@ -123,24 +138,31 @@ const StatusBadge = ({ status }) => {
   )
 }
 
-const PetSelectorCard = ({ pet, isSelected, onSelect, onEdit, onDelete }) => (
-  <button
-    type="button"
-    onClick={onSelect}
-    className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200 ${
-      isSelected
-        ? 'border-teal bg-teal/5'
-        : 'border-line/70 bg-white hover:border-teal/30 hover:bg-mist'
-    }`}
-  >
-    <PetImage src={pet.profileImage} alt={pet.name} size="lg" fallbackClassName="bg-teal/10 text-teal" />
-    <div className="min-w-0 flex-1">
-      <p className="truncate text-sm font-bold text-ink">{pet.name}</p>
-      <p className="truncate text-xs text-muted">{pet.breed || pet.species || 'Breed not set'}</p>
+const PetSelectorCard = ({ pet, isSelected, onSelect, onEdit, onDelete, backendUrl, onAddPhoto, onChangePhoto, onDeletePhoto }) => {
+  const hasPhoto = Boolean(getPetImageSrc(pet, backendUrl))
+  return (
+    <div className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition-all duration-200 ${isSelected ? 'border-teal bg-teal/5' : 'border-line/70 bg-white hover:border-teal/30 hover:bg-mist'}`}>
+      <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <PetImage src={getPetImageSrc(pet, backendUrl)} alt={pet.name} size="lg" fallbackClassName="bg-teal/10 text-teal" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-ink">{pet.name}</p>
+          <p className="truncate text-xs text-muted">{pet.breed || pet.species || 'Breed not set'}</p>
+        </div>
+        <StatusBadge status={pet.vaccinationStatus} />
+      </button>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        {hasPhoto ? (
+          <>
+            <button type="button" className="text-[11px] font-semibold text-teal hover:text-teal/80" onClick={onChangePhoto}>Change Photo</button>
+            <button type="button" className="text-[11px] font-semibold text-red-600 hover:text-red-700" onClick={onDeletePhoto}>Delete Photo</button>
+          </>
+        ) : (
+          <button type="button" className="text-[11px] font-semibold text-teal hover:text-teal/80" onClick={onAddPhoto}>Add Photo</button>
+        )}
+      </div>
     </div>
-    <StatusBadge status={pet.vaccinationStatus} />
-  </button>
-)
+  )
+}
 
 const PetProfileView = ({ pet, activeTab, setActiveTab, records, vaccinations, reports, onEdit, onDelete }) => {
   const healthStatus = pet.vaccinationStatus || 'unknown'
@@ -441,6 +463,78 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [formError, setFormError] = useState('')
   const [draft, setDraft] = useState(petDraft)
   const [ownerForm, setOwnerForm] = useState(ownerDraft)
+  const petFileInputRef = useRef(null)
+  const [petPhotoPet, setPetPhotoPet] = useState(null)
+  const [petPreview, setPetPreview] = useState(null)
+  const [petSelectedFile, setPetSelectedFile] = useState(null)
+  const [petPhotoSaving, setPetPhotoSaving] = useState(false)
+  const PET_PHOTO_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+  const PET_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+  const openPetPhotoPicker = (pet) => {
+    setPetPhotoPet(pet)
+    setPetPreview(null)
+    setPetSelectedFile(null)
+    if (petFileInputRef.current) petFileInputRef.current.value = ''
+    petFileInputRef.current?.click()
+  }
+  const handlePetFileChange = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!PET_PHOTO_ACCEPTED_TYPES.includes(file.type)) {
+      toast.error('Please choose a JPG, PNG, or WEBP image.')
+      return
+    }
+    if (file.size > PET_PHOTO_MAX_BYTES) {
+      toast.error('Image is too large. Maximum size is 5MB.')
+      return
+    }
+    setPetSelectedFile(file)
+    setPetPreview(URL.createObjectURL(file))
+  }
+  const savePetPhoto = async () => {
+    if (!petPhotoPet || !petSelectedFile || petPhotoSaving) return
+    setPetPhotoSaving(true)
+    try {
+      const reader = new FileReader()
+      const dataUrl = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsDataURL(petSelectedFile)
+      })
+      const payload = buildPetPayload({ ...petToDraft(petPhotoPet), profileImage: dataUrl })
+      await axios.put(`${backendUrl}/api/v1/veterinary/pets/${getId(petPhotoPet)}`, payload, authConfig(token))
+      toast.success('Pet photo updated')
+      setPetPreview(null)
+      setPetSelectedFile(null)
+      setPetPhotoPet(null)
+      await loadAll()
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) {
+        toast.error(requestError.response?.data?.message || requestError.message || 'Unable to save pet photo')
+      }
+    } finally {
+      setPetPhotoSaving(false)
+    }
+  }
+  const deletePetPhoto = async (pet) => {
+    if (!pet) return
+    const confirmed = window.confirm(`Remove ${pet.name}'s photo? This will restore the default avatar.`)
+    if (!confirmed) return
+    setPetPhotoSaving(true)
+    try {
+      const payload = buildPetPayload({ ...petToDraft(pet), profileImage: '' })
+      await axios.put(`${backendUrl}/api/v1/veterinary/pets/${getId(pet)}`, payload, authConfig(token))
+      toast.success('Pet photo removed')
+      await loadAll()
+    } catch (requestError) {
+      if (!isAuthSessionHandledError(requestError)) {
+        toast.error(requestError.response?.data?.message || requestError.message || 'Unable to remove pet photo')
+      }
+    } finally {
+      setPetPhotoSaving(false)
+    }
+  }
 
   // ---- Profile photo (reuses the existing user upload/delete APIs) ----
   const ownerFileInputRef = useRef(null)
@@ -1058,6 +1152,10 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
                 onSelect={() => setSelectedPetInList(pet)}
                 onEdit={() => openEdit(pet)}
                 onDelete={() => { setSelectedPet(pet); setFormError(''); setModal('delete') }}
+                backendUrl={backendUrl}
+                onAddPhoto={() => openPetPhotoPicker(pet)}
+                onChangePhoto={() => openPetPhotoPicker(pet)}
+                onDeletePhoto={() => deletePetPhoto(pet)}
               />
             ))}
           </div>
@@ -2075,6 +2173,20 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {modal === 'register' && <Modal title='Register pet' onClose={() => setModal('')}><PetForm draft={draft} setDraft={setDraft} onSubmit={savePet} saving={saving} submitLabel='Register pet' error={formError} /></Modal>}
       {modal === 'edit' && <Modal title='Edit pet' onClose={() => setModal('')}><PetForm draft={draft} setDraft={setDraft} onSubmit={savePet} saving={saving} submitLabel='Update pet' error={formError} /></Modal>}
       {modal === 'delete' && selectedPet && <Modal title='Delete confirmation' onClose={() => setModal('')}><div className='space-y-4'><p className='text-sm leading-6 text-slate-600'>Delete {selectedPet.name}? This removes the pet profile and connected veterinary records from the veterinary database.</p>{formError && <p className='rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{formError}</p>}<div className='flex gap-3'><button type='button' disabled={saving} className='rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60' onClick={deletePet}>{saving ? 'Deleting...' : 'Delete pet'}</button><button type='button' className='mf-button-secondary' onClick={() => setModal('')}>Cancel</button></div></div></Modal>}
+
+      <input ref={petFileInputRef} type='file' accept='image/jpeg,image/png,image/webp' className='hidden' onChange={handlePetFileChange} />
+
+      {petPreview && petPhotoPet && (
+        <Modal title={`${petPhotoPet.name}'s photo`} onClose={() => { setPetPreview(null); setPetSelectedFile(null); setPetPhotoPet(null) }}>
+          <div className='space-y-4'>
+            <img src={petPreview} alt='Pet photo preview' className='mx-auto max-h-72 rounded-xl object-cover' />
+            <div className='flex justify-end gap-3'>
+              <button type='button' className='mf-button-secondary' onClick={() => { setPetPreview(null); setPetSelectedFile(null); setPetPhotoPet(null) }}>Cancel</button>
+              <button type='button' className='mf-button' disabled={petPhotoSaving} onClick={savePetPhoto}>{petPhotoSaving ? 'Saving...' : 'Save photo'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </section>
   )
 }

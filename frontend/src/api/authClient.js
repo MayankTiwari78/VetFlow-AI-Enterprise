@@ -56,7 +56,11 @@ const isProtectedPatientEndpoint = (path = '') =>
 const isProtectedAuthEndpoint = (path = '') =>
   path.startsWith('/api/v1/auth/') && !isRefreshEndpoint(path) && !isPublicAuthEndpoint(path)
 
-const canRefreshRequest = (path = '') => isProtectedPatientEndpoint(path) || isProtectedAuthEndpoint(path)
+const isProtectedVeterinaryEndpoint = (path = '') =>
+  path.startsWith('/api/v1/veterinary/')
+
+const canRefreshRequest = (path = '') =>
+  isProtectedPatientEndpoint(path) || isProtectedAuthEndpoint(path) || isProtectedVeterinaryEndpoint(path)
 
 const persistToken = (token) => {
   if (inBrowser()) {
@@ -180,6 +184,13 @@ export const configurePatientAuth = ({ backendUrl, setToken, onAuthCleared } = {
       }
     }
 
+    if (token && isProtectedVeterinaryEndpoint(path)) {
+      config.headers = {
+        ...config.headers,
+        Authorization: config.headers?.Authorization || `Bearer ${token}`
+      }
+    }
+
     return config
   })
 
@@ -208,7 +219,8 @@ export const configurePatientAuth = ({ backendUrl, setToken, onAuthCleared } = {
         original.headers = {
           ...original.headers,
           ...(isProtectedPatientEndpoint(path) ? { token } : {}),
-          ...(isProtectedAuthEndpoint(path) ? { Authorization: `Bearer ${token}` } : {})
+          ...(isProtectedAuthEndpoint(path) ? { Authorization: `Bearer ${token}` } : {}),
+          ...(isProtectedVeterinaryEndpoint(path) ? { Authorization: `Bearer ${token}` } : {})
         }
         return axios(original)
       } catch {
