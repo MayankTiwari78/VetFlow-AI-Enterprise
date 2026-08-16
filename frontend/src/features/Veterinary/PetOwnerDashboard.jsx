@@ -9,6 +9,7 @@ import { useProtectedPatientRoute } from '../../hooks/useProtectedPatientRoute'
 import { useNavigate, useParams } from '../../lib/routerCompat'
 import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
 import { getProfileImageSrc, isCustomProfileImage } from '../../lib/profileImage'
+import AiSymptomForm from './AiSymptomForm'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
 import { User, Bell, Shield, CreditCard, Globe, ChevronRight, KeyRound, Smartphone, Monitor, History, CheckCircle2, Sparkles, FileText, PawPrint, Settings } from 'lucide-react'
@@ -1210,7 +1211,22 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
         />
       )}
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
-      {view === 'ai' && <div className='space-y-4'>{reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}{reports.length === 0 && <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />}</div>}
+      {view === 'ai' && (
+        <div className='space-y-6'>
+          {selectedPet && (
+            <AiSymptomForm
+              backendUrl={backendUrl}
+              token={token}
+              petId={getId(selectedPet)}
+              onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
+            />
+          )}
+          <div className='space-y-4'>
+            {reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}
+            {reports.length === 0 && <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />}
+          </div>
+        </div>
+      )}
       {view === 'appointments' && <AppointmentsView appointments={appointments} pets={pets} onRefresh={loadAll} />}
 
       {view === 'profile' && (

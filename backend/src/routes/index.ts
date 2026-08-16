@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { health, readiness } from "../controllers/healthController.js";
 import adminRouter from "./adminRoutes.js";
+import aiMlRouter from "./aiMlRoutes.js";
 import auditRouter from "./auditRoutes.js";
 import authRouter from "./authRoutes.js";
 import authorizationRouter from "./authorizationRoutes.js";
@@ -19,6 +20,7 @@ router.use("/v1/authorization", authorizationRouter);
 router.use("/v1/organizations", organizationRouter);
 router.use("/v1/audit-logs", auditRouter);
 router.use("/v1/veterinary", veterinaryRouter);
+router.use("/v1/veterinary/ai-ml", aiMlRouter);
 router.use("/user", userRouter);
 router.use("/admin", adminRouter);
 router.use("/doctor", doctorRouter);
