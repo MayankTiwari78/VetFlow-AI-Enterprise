@@ -14,7 +14,7 @@ export const registerOpenApiRoutes = (app: Express): void => {
       "/api-docs",
       swaggerUi.serve,
       swaggerUi.setup(openApiDocument, {
-        customSiteTitle: "MedFlow AI API Documentation"
+        customSiteTitle: "VetFlow-AI API Documentation"
       })
     );
   }

@@ -1,4 +1,4 @@
-# MedFlow Backend
+# VetFlow-AI Backend
 
 This backend uses the TypeScript Express architecture established in Phase 1A and the enterprise authentication foundation added in Phase 1B.
 

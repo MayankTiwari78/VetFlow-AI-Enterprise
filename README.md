@@ -1,8 +1,8 @@
-# MedFlow AI – Intelligent Healthcare SaaS Platform
+# VetFlow-AI — Veterinary / Pet Healthcare Platform
 
 Developed and maintained by **Mayank Tiwari**.
 
-MedFlow AI is a healthcare SaaS platform with separate patient, doctor, and admin web clients backed by an Express API.
+VetFlow-AI is a veterinary/pet healthcare SaaS platform with separate pet-owner, veterinarian, and clinic/admin web clients backed by an Express API. It provides veterinary medical records, vaccination tracking, veterinary dashboards, and AI/ML-assisted veterinary symptom prediction with AI-generated reports, on top of the platform's existing authentication and account-security infrastructure.
 
 ## Phase 1A Through 1D Status
 

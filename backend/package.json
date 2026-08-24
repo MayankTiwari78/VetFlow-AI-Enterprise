@@ -1,7 +1,7 @@
 {
   "name": "medflow-backend",
   "version": "1.0.0",
-  "description": "MedFlow AI backend API",
+  "description": "VetFlow-AI backend API",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {

@@ -258,10 +258,10 @@ const petFilterParameters = [
 export const openApiDocument = {
   openapi: "3.0.3",
   info: {
-    title: "MedFlow AI API",
+    title: "VetFlow-AI API",
     version: "1.0.0",
     description:
-      "MedFlow AI backend API covering authentication, RBAC, organizations, sessions, audit logs, patient health profiles, doctor availability, appointments, clinical workflows, and payments."
+      "VetFlow-AI backend API for a veterinary/pet healthcare platform, covering authentication, RBAC, organizations, sessions, audit logs, patient health profiles, doctor availability, appointments, clinical workflows, and payments."
   },
   servers: [{ url: "http://localhost:4000", description: "Local development backend" }],
   tags: [

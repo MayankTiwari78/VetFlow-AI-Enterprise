@@ -1,4 +1,4 @@
-# MedFlow AI Admin And Doctor Portal
+# VetFlow-AI Admin And Veterinarian Portal
 
 The administrator and doctor portal uses Next.js App Router. It preserves administrator dashboards, appointment and doctor management, organization memberships, audit logs, 2FA/session security, doctor dashboards, appointments, and profile routes. Visibility controls are convenience only; all permissions and tenant boundaries remain enforced by the API.
 

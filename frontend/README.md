@@ -1,4 +1,4 @@
-# MedFlow AI Patient App
+# VetFlow-AI Pet Owner App
 
 The patient client uses Next.js App Router. It preserves the appointment discovery and booking, profile, payment verification, email verification, password recovery, OTP, TOTP login, recovery-code, session, and account-security routes from the prior client.
 
