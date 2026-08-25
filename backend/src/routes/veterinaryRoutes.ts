@@ -29,6 +29,7 @@ import {
   updateMedicalRecord,
   updatePetOwner,
   updatePetProfile,
+  updatePreliminaryAiReportReview,
   updateVaccinationRecord,
   updateVeterinarianProfile,
   vaccinationById,
@@ -44,6 +45,7 @@ import {
   aiReportCreateSchema,
   aiReportIdParamSchema,
   aiReportQuerySchema,
+  aiReportReviewUpdateSchema,
   ownerIdQuerySchema,
   petCreateSchema,
   petIdParamSchema,
@@ -285,6 +287,13 @@ veterinaryRouter.get(
   authAny,
   validateRequest({ params: aiReportIdParamSchema }),
   preliminaryAiReportById
+);
+veterinaryRouter.patch(
+  "/ai-reports/:reportId/review",
+  authAny,
+  authorizePermissions("appointments:update"),
+  validateRequest({ params: aiReportIdParamSchema, body: aiReportReviewUpdateSchema }),
+  updatePreliminaryAiReportReview
 );
 veterinaryRouter.delete(
   "/ai-reports/:reportId",

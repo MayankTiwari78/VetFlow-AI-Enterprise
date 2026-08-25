@@ -90,6 +90,8 @@ const fakeDb = vi.hoisted(() => {
   const authSecurity = new Map<string, RecordData>();
   const medicalRecords = new Map<string, RecordData>();
   const familyMembers = new Map<string, RecordData>();
+  const pets = new Map<string, RecordData>();
+  const aiReports = new Map<string, RecordData>();
 
   const makeId = () => counter.toString(16).padStart(24, "0");
 
@@ -581,6 +583,53 @@ const fakeDb = vi.hoisted(() => {
     }
   }
 
+  class PetModel extends FakeDocument {
+    public override async save() {
+      pets.set(this._id, this as RecordData);
+      return this;
+    }
+
+    public static findOne(filter: QueryFilter) {
+      return Promise.resolve([...pets.values()].find((pet) => matches(pet, filter)) ?? null);
+    }
+
+    public static findById(id: string) {
+      return query(pets.get(id) ?? null);
+    }
+
+    public static find(filter: QueryFilter = {}) {
+      return query([...pets.values()].filter((pet) => matches(pet, filter)));
+    }
+  }
+
+  class AIReportModel extends FakeDocument {
+    public override async save() {
+      this.veterinarianReviewStatus ??= "pending";
+      aiReports.set(this._id, this as RecordData);
+      return this;
+    }
+
+    public static findOne(filter: QueryFilter) {
+      return Promise.resolve([...aiReports.values()].find((report) => matches(report, filter)) ?? null);
+    }
+
+    public static findById(id: string) {
+      return query(aiReports.get(id) ?? null);
+    }
+
+    public static findByIdAndUpdate(id: string, update: QueryFilter) {
+      const doc = aiReports.get(id);
+      if (doc) {
+        applyUpdate(doc, update);
+      }
+      return Promise.resolve(doc ?? null);
+    }
+
+    public static find(filter: QueryFilter = {}) {
+      return query([...aiReports.values()].filter((report) => matches(report, filter)));
+    }
+  }
+
   const patientPassword = "PatientPass12!";
   const doctorPassword = "DoctorPass12!";
 
@@ -596,6 +645,8 @@ const fakeDb = vi.hoisted(() => {
     authSecurity.clear();
     medicalRecords.clear();
     familyMembers.clear();
+    pets.clear();
+    aiReports.clear();
     counter = 10;
 
     organizations.set(
@@ -849,6 +900,8 @@ const fakeDb = vi.hoisted(() => {
     authSecurity,
     medicalRecords,
     familyMembers,
+    pets,
+    aiReports,
     patientPassword,
     doctorPassword,
     UserModel,
@@ -861,7 +914,9 @@ const fakeDb = vi.hoisted(() => {
     AuditLogModel,
     AuthSecurityModel,
     MedicalRecordModel,
-    FamilyMemberModel
+    FamilyMemberModel,
+    PetModel,
+    AIReportModel
   };
 });
 
@@ -890,6 +945,12 @@ vi.mock("../src/models/MedicalRecord.js", () => ({
   MEDICAL_RECORD_STATUSES: ["draft", "finalized"]
 }));
 vi.mock("../src/models/FamilyMember.js", () => ({ default: fakeDb.FamilyMemberModel }));
+vi.mock("../src/models/Pet.js", () => ({ default: fakeDb.PetModel }));
+vi.mock("../src/models/AIReport.js", () => ({
+  default: fakeDb.AIReportModel,
+  AI_REPORT_SEVERITIES: ["low", "moderate", "high", "urgent"],
+  AI_REPORT_REVIEW_STATUSES: ["pending", "reviewed", "dismissed"]
+}));
 vi.mock("bcrypt", () => ({
   default: {
     hash: vi.fn(async (password: string) => `hashed:${password}`),
@@ -2251,6 +2312,97 @@ describe("MedFlow backend foundation and Phase 1B authentication", () => {
           expect(JSON.stringify(lookupResponse.body.status)).not.toContain("bloodGroup");
           expect(JSON.stringify(lookupResponse.body.status)).not.toContain(fakeDb.ids.user);
         });
+    });
+  });
+
+  describe("AI report veterinarian review", () => {
+    const petId = "0000000000000000000000a1";
+    const reportId = "0000000000000000000000b1";
+    const missingReportId = "0000000000000000000000cc";
+
+    const seedReport = () => {
+      fakeDb.pets.set(petId, {
+        _id: petId,
+        name: "Rex",
+        species: "Dog",
+        ownerId: "0000000000000000000000d1"
+      });
+      fakeDb.aiReports.set(reportId, {
+        _id: reportId,
+        petId,
+        symptoms: ["cough"],
+        aiSummary: "Preliminary assessment",
+        possibleConditions: ["Kennel_Cough"],
+        severity: "moderate",
+        recommendations: ["Consult a veterinarian"],
+        veterinarianReviewStatus: "pending",
+        generatedAt: new Date()
+      });
+    };
+
+    const adminBearer = async () => {
+      const login = await request(app)
+        .post("/api/admin/login")
+        .send({ email: "admin@example.com", password: "Password123" })
+        .expect(200);
+      return login.body.token as string;
+    };
+
+    it("lets an admin update the veterinarian review status", async () => {
+      seedReport();
+      const token = await adminBearer();
+
+      const response = await request(app)
+        .patch(`/api/v1/veterinary/ai-reports/${reportId}/review`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ veterinarianReviewStatus: "reviewed" })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.report.veterinarianReviewStatus).toBe("reviewed");
+      expect(fakeDb.aiReports.get(reportId)?.veterinarianReviewStatus).toBe("reviewed");
+    });
+
+    it("rejects an invalid review status with 400", async () => {
+      seedReport();
+      const token = await adminBearer();
+
+      await request(app)
+        .patch(`/api/v1/veterinary/ai-reports/${reportId}/review`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ veterinarianReviewStatus: "not-a-status" })
+        .expect(400);
+    });
+
+    it("returns 404 when the report does not exist", async () => {
+      const token = await adminBearer();
+
+      await request(app)
+        .patch(`/api/v1/veterinary/ai-reports/${missingReportId}/review`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ veterinarianReviewStatus: "reviewed" })
+        .expect(404);
+    });
+
+    it("forbids a patient from updating the review status", async () => {
+      seedReport();
+      const login = await request(app)
+        .post("/api/user/login")
+        .send({ email: "patient@example.com", password: fakeDb.patientPassword })
+        .expect(200);
+
+      await request(app)
+        .patch(`/api/v1/veterinary/ai-reports/${reportId}/review`)
+        .set("Authorization", `Bearer ${login.body.token}`)
+        .send({ veterinarianReviewStatus: "reviewed" })
+        .expect(403);
+    });
+
+    it("requires authentication", async () => {
+      await request(app)
+        .patch(`/api/v1/veterinary/ai-reports/${reportId}/review`)
+        .send({ veterinarianReviewStatus: "reviewed" })
+        .expect(401);
     });
   });
 

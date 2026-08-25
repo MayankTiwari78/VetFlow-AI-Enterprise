@@ -31,6 +31,7 @@ import {
   listVaccinationsByPet,
   listVeterinarians,
   searchPetOwners,
+  updateAiReportReviewStatus,
   updatePet,
   updatePetMedicalRecord,
   updatePetOwnerProfile,
@@ -334,4 +335,13 @@ export const preliminaryAiReportById: RequestHandler = asyncHandler(async (req, 
 export const deletePreliminaryAiReport: RequestHandler = asyncHandler(async (req, res) => {
   await deleteAiReport(veterinaryActorFromRequest(req), req.params.reportId as string);
   sendSuccess(res, 200, "Preliminary assessment report deleted");
+});
+
+export const updatePreliminaryAiReportReview: RequestHandler = asyncHandler(async (req, res) => {
+  const report = await updateAiReportReviewStatus(
+    veterinaryActorFromRequest(req),
+    req.params.reportId as string,
+    req.body as Parameters<typeof updateAiReportReviewStatus>[2]
+  );
+  sendSuccess(res, 200, "Preliminary assessment report review status updated", { report });
 });

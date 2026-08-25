@@ -95,6 +95,10 @@ type AiReportPayload = {
   generatedAt: Date;
 };
 
+type AiReportReviewPayload = {
+  veterinarianReviewStatus: "pending" | "reviewed" | "dismissed";
+};
+
 type ListingQuery = {
   page?: number;
   limit?: number;
@@ -1132,6 +1136,24 @@ export const deleteAiReport = async (actor: VeterinaryActor, reportId: string): 
   if (!report) throw new AppError("AI report not found", 404);
   await assertPetAccess(actor, String(report.petId), "manage");
   await AIReportModel.deleteOne({ _id: reportId });
+};
+
+export const updateAiReportReviewStatus = async (
+  actor: VeterinaryActor,
+  reportId: string,
+  payload: AiReportReviewPayload
+) => {
+  requireAnyPermission(actor, ["appointments:update"]);
+  const report = await AIReportModel.findById(reportId);
+  if (!report) throw new AppError("AI report not found", 404);
+  await assertPetAccess(actor, String(report.petId), actor.accountType === "doctor" ? "read" : "manage");
+  const updated = await AIReportModel.findByIdAndUpdate(
+    reportId,
+    { veterinarianReviewStatus: payload.veterinarianReviewStatus },
+    { new: true, runValidators: true }
+  );
+  if (!updated) throw new AppError("AI report not found", 404);
+  return updated;
 };
 
 export const getVeterinaryDashboardStats = async (

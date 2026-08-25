@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { AI_REPORT_SEVERITIES } from "../models/AIReport.js";
+import { AI_REPORT_REVIEW_STATUSES, AI_REPORT_SEVERITIES } from "../models/AIReport.js";
 import { addressInputSchema, objectIdSchema } from "./common.js";
 
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
@@ -204,6 +204,10 @@ export const aiReportCreateSchema = z.object({
 
 export const aiReportQuerySchema = veterinaryListQuerySchema.extend({
   petId: objectIdSchema.optional()
+});
+
+export const aiReportReviewUpdateSchema = z.object({
+  veterinarianReviewStatus: z.enum(AI_REPORT_REVIEW_STATUSES)
 });
 
 export const petOwnerSearchQuerySchema = veterinaryListQuerySchema.extend({
