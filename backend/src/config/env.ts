@@ -67,7 +67,9 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   SERVICE_NAME: z.string().trim().min(1).default("medflow-backend"),
   ENABLE_API_DOCS: booleanFromEnv.default(false),
-  DEVELOPMENT_AUTO_VERIFY_EMAIL: z.string().default("false")
+  DEVELOPMENT_AUTO_VERIFY_EMAIL: z.string().default("false"),
+  CV_PYTHON_PATH: z.string().trim().optional(),
+  CV_STAGE2_ROOT: z.string().trim().optional()
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

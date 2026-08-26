@@ -9,6 +9,7 @@ import { useProtectedPatientRoute } from '../../hooks/useProtectedPatientRoute'
 import { useNavigate, useParams } from '../../lib/routerCompat'
 import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
 import { getProfileImageSrc, isCustomProfileImage } from '../../lib/profileImage'
+import AiImageAssessment from './AiImageAssessment'
 import AiSymptomForm from './AiSymptomForm'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
@@ -1213,6 +1214,13 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
       {view === 'ai' && (
         <div className='space-y-6'>
+          {selectedPet && (
+            <AiImageAssessment
+              backendUrl={backendUrl}
+              token={token}
+              pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
+            />
+          )}
           {selectedPet && (
             <AiSymptomForm
               backendUrl={backendUrl}

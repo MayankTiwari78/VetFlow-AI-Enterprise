@@ -62,6 +62,8 @@ const assertPetAccess = async (actor: VeterinaryActor, petId: string): Promise<v
   throw new AppError("Pet not found", 404);
 };
 
+export { assertPetAccess };
+
 const runPythonPrediction = async (symptoms: SymptomInput): Promise<Record<string, unknown>> => {
   const input = JSON.stringify({ symptoms });
   const command = `python "${ML_SCRIPT}" "${input.replace(/"/g, '\\"')}"`;

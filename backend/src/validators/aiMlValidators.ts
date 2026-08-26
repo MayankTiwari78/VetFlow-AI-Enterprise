@@ -23,3 +23,11 @@ export const aiPredictionSchema = z.object({
 });
 
 export const aiPredictionSaveSchema = aiPredictionSchema;
+
+/**
+ * Stage 2C AI image assessment (multipart/form-data).
+ * petId arrives as a form field alongside the uploaded file.
+ */
+export const cvImagePredictionSchema = z.object({
+  petId: objectIdSchema
+});
