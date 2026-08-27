@@ -4,7 +4,10 @@ import {
   predictAiReport,
   predictAndSaveAiReport
 } from "../controllers/aiMlController.js";
-import { predictAiImageReport } from "../controllers/cvImageController.js";
+import {
+  predictAiImageReport,
+  predictAndSaveAiImageReport
+} from "../controllers/cvImageController.js";
 import { authAny } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
 import { validateRequest } from "../middleware/validateRequest.js";
@@ -33,6 +36,15 @@ aiMlRouter.post(
   upload.single("image"),
   validateRequest({ body: cvImagePredictionSchema }),
   predictAiImageReport
+);
+// Persist a successful image assessment into the shared AI Health Reports
+// history so it can be listed/detailed and reviewed by a veterinarian.
+aiMlRouter.post(
+  "/predict-image-and-save",
+  authAny,
+  upload.single("image"),
+  validateRequest({ body: cvImagePredictionSchema }),
+  predictAndSaveAiImageReport
 );
 
 export default aiMlRouter;

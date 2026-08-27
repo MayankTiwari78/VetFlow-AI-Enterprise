@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'react-toastify'
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024
 const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -32,11 +33,13 @@ const formatPercent = (value) => `${Math.round((Number(value) || 0) * 100)}%`
  * Adds an upload/preview/predict section next to the existing symptom form;
  * the symptom-based flow is untouched.
  */
-const AiImageAssessment = ({ backendUrl, token, pet }) => {
+const AiImageAssessment = ({ backendUrl, token, pet, onReportSaved }) => {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null)
+  const [savedReportId, setSavedReportId] = useState(null)
   const [error, setError] = useState('')
   const inputRef = useRef(null)
 
@@ -50,6 +53,7 @@ const AiImageAssessment = ({ backendUrl, token, pet }) => {
   const selectFile = (event) => {
     setError('')
     setResult(null)
+    setSavedReportId(null)
     const selected = event.target.files?.[0] ?? null
 
     if (!selected) {
@@ -80,6 +84,7 @@ const AiImageAssessment = ({ backendUrl, token, pet }) => {
     setFile(null)
     setPreviewUrl('')
     setResult(null)
+    setSavedReportId(null)
     setError('')
     if (inputRef.current) inputRef.current.value = ''
   }
@@ -87,12 +92,13 @@ const AiImageAssessment = ({ backendUrl, token, pet }) => {
   const runAssessment = async () => {
     if (!pet?.id) { setError('Please select a pet first.'); return }
     if (!file) { setError('Please choose an image first.'); return }
-    setLoading(true); setError(''); setResult(null)
+    setLoading(true); setError(''); setResult(null); setSavedReportId(null)
     try {
       const formData = new FormData()
       formData.append('petId', pet.id)
       formData.append('image', file)
 
+      // Phase 1 — prediction only. Nothing is persisted until Save Report.
       const { data } = await axios.post(
         `${backendUrl}/api/v1/veterinary/ai-ml/predict-image`,
         formData,
@@ -116,6 +122,45 @@ const AiImageAssessment = ({ backendUrl, token, pet }) => {
           'AI image assessment failed. Please try again later.'
       )
     } finally { setLoading(false) }
+  }
+
+  const saveReport = async () => {
+    // Phase 2 — explicit user opt-in to persist the displayed assessment.
+    if (!pet?.id || !file || !result || loading || saving) return
+    setSaving(true); setError('')
+    try {
+      const formData = new FormData()
+      formData.append('petId', pet.id)
+      formData.append('image', file)
+
+      const { data } = await axios.post(
+        `${backendUrl}/api/v1/veterinary/ai-ml/predict-image-and-save`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 180000
+        }
+      )
+
+      // The save endpoint responds with { data: { report } }; the persisted
+      // document repeats the Stage 2C contract under report.imageAssessment.
+      const report = data?.data?.report ?? null
+      if (!report?._id || !report.imageAssessment) {
+        throw new Error('Unexpected response while saving the AI image report')
+      }
+      setSavedReportId(String(report._id))
+      toast.success('Preliminary AI image assessment saved to history')
+      onReportSaved?.()
+    } catch (e) {
+      setError(
+        e.response?.data?.message ||
+          e.message ||
+          'Saving the AI image report failed. Please try again.'
+      )
+    } finally { setSaving(false) }
   }
 
   const findings = result?.imageFindings
@@ -166,17 +211,27 @@ const AiImageAssessment = ({ backendUrl, token, pet }) => {
                   type='file'
                   accept={ACCEPTED_MIME_TYPES.join(',')}
                   onChange={selectFile}
-                  disabled={loading}
+                  disabled={loading || saving}
                   className='mf-field mt-1 file:mr-3 file:rounded-md file:border-0 file:bg-teal/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-teal'
                 />
               </label>
               {file && <p className='text-xs text-muted'>Selected: {file.name} ({Math.round(file.size / 1024)} KB)</p>}
               <div className='flex flex-wrap gap-3'>
-                <button className='mf-button' type='button' disabled={loading || !file} onClick={runAssessment}>
+                <button className='mf-button' type='button' disabled={loading || saving || !file} onClick={runAssessment}>
                   {loading ? 'Analysing image...' : 'Run AI Image Assessment'}
                 </button>
+                {result && (
+                  <button
+                    className='mf-button'
+                    type='button'
+                    disabled={loading || saving || Boolean(savedReportId)}
+                    onClick={saveReport}
+                  >
+                    {saving ? 'Saving...' : savedReportId ? '✓ Saved to history' : 'Save Report'}
+                  </button>
+                )}
                 {file && (
-                  <button className='mf-button-secondary' type='button' disabled={loading} onClick={clearSelection}>Clear selection</button>
+                  <button className='mf-button-secondary' type='button' disabled={loading || saving} onClick={clearSelection}>Clear selection</button>
                 )}
               </div>
             </div>
@@ -231,6 +286,16 @@ const AiImageAssessment = ({ backendUrl, token, pet }) => {
                 </ul>
               </details>
               {result.disclaimer && <p className='mt-3 text-xs italic text-slate-500'>{result.disclaimer}</p>}
+            </div>
+          )}
+
+          {savedReportId && (
+            <div role='status' className='mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'>
+              <p className='font-semibold'>✓ Saved to AI Health Reports history.</p>
+              <p className='mt-1 text-xs font-normal'>
+                Report ID: {savedReportId}. It appears in the AI Health Reports history below,
+                is visible after reload, and awaits veterinarian review (status: pending).
+              </p>
             </div>
           )}
         </>

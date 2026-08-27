@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { env } from "../config/env.js";
 import { assertPetAccess, type VeterinaryActor } from "./aiMlService.js";
+import { createAiReport } from "./veterinaryService.js";
 import PetModel from "../models/Pet.js";
 import { AppError } from "../utils/AppError.js";
 
@@ -190,4 +191,92 @@ export const runAiImagePrediction = async (
     // on every post-validation path (unsupported species, missing pet, errors).
     await fs.rm(path.resolve(payload.file.path), { force: true }).catch(() => undefined);
   }
+};
+/**
+ * Severity band used by the shared AI report model. Mirrors the symptom-report
+ * convention (High -> high, Moderate -> moderate, else low).
+ */
+const severityFromBand = (band: string | undefined): "low" | "moderate" | "high" => {
+  if (band === "High") return "high";
+  if (band === "Moderate") return "moderate";
+  return "low";
+};
+
+/**
+ * Map the raw Stage 2C prediction contract into the shared AIReport document
+ * shape. The existing symptom report stores its model output under `prediction`;
+ * image assessments store the full Stage 2C contract under `imageAssessment`
+ * and the same mapped fields under `prediction` so existing list/detail/review
+ * consumers work unchanged. No filesystem paths are persisted here.
+ */
+const buildImageReportFromPrediction = (
+  petId: string,
+  prediction: Record<string, unknown>
+): Record<string, unknown> => {
+  const findings = (prediction.imageFindings as Record<string, unknown>) ?? {};
+  const confidence = (prediction.imageConfidence as Record<string, unknown>) ?? {};
+
+  const topConditions = Array.isArray(findings.top_conditions)
+    ? (findings.top_conditions as Array<{ class?: string; probability?: number }>)
+    : [];
+  const predictedClass =
+    typeof findings.predicted_class === "string" ? findings.predicted_class : "Unknown";
+  const band = typeof confidence.band === "string" ? confidence.band : "Low";
+  const probability = typeof confidence.probability === "number" ? confidence.probability : 0;
+
+  return {
+    petId,
+    symptoms: [],
+    uploadedImages: [],
+    aiSummary:
+      `Preliminary AI image assessment for ${predictedClass.replace(/_/g, " ")} with ${band} confidence ` +
+      `(probability ${(probability * 100).toFixed(1)}%). This is a computer-vision screening result, ` +
+      `not a clinical diagnosis. Veterinarian review is required.`,
+    possibleConditions: topConditions.map((item) => item.class ?? "").filter(Boolean),
+    severity: severityFromBand(band),
+    recommendations: [
+      "Veterinarian review is required before any treatment decision.",
+      "This is a preliminary computer-vision screening result, not a clinical diagnosis."
+    ],
+    generatedAt: new Date(),
+    veterinarianReviewStatus: "pending",
+    modality: "image",
+    imageAssessment: prediction,
+    modelVersion:
+      typeof findings.model_version === "string" ? findings.model_version : "vetflow-cv-v2.0.0-dev",
+    contractVersion: "1.0.0",
+    prediction: {
+      predictedCondition: predictedClass,
+      modelProbability: probability,
+      confidenceLevel: band,
+      // Reuse the shared `topPredictions[{condition, probability}]` shape.
+      topPredictions: topConditions.map((item) => ({
+        condition: item.class ?? "Unknown",
+        probability: typeof item.probability === "number" ? item.probability : 0
+      })),
+      probabilities: (findings.probabilities as Record<string, number>) ?? {},
+      explanation: {
+        ...findings,
+        disclaimer: typeof prediction.disclaimer === "string" ? prediction.disclaimer : ""
+      }
+    }
+  };
+};
+
+/**
+ * Persist a successful Stage 2C image assessment into the shared AI report
+ * store so it appears in the existing AI Health Reports history and the
+ * existing veterinarian-review workflow (same model + endpoints used by the
+ * symptom reports). Ownership + authorization are enforced here via the shared
+ * `createAiReport` service.
+ */
+export const saveAiImageReport = async (
+  actor: VeterinaryActor,
+  payload: CvImagePredictionPayload,
+  prediction: Record<string, unknown>
+) => {
+  const reportPayload = buildImageReportFromPrediction(payload.petId, prediction);
+  // createAiReport saves via the shared AIReport model (modality/imageAssessment
+  // fields are picked up by the schema). Throws AppError for authorization/ownership.
+  return createAiReport(actor, reportPayload as Parameters<typeof createAiReport>[1]);
 };

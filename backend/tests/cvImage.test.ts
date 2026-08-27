@@ -73,6 +73,15 @@ vi.mock("../src/services/aiMlService.js", async (importOriginal) => ({
   assertPetAccess: (...args: unknown[]) => assertPetAccessMock(...args)
 }));
 
+// saveAiImageReport delegates ownership + persistence to the shared
+// createAiReport service; mock it so we can assert the mapped report payload
+// (history/review integration) without a database.
+const createAiReportMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/veterinaryService.js", () => ({
+  createAiReport: createAiReportMock
+}));
+
 const AI_INFERENCE_ERROR = "AI image assessment failed while analysing this image.";
 
 
@@ -81,7 +90,8 @@ import {
   CV_SUPPORTED_SPECIES,
   SPECIES_TO_CV_HEAD,
   headKeyForSpecies,
-  runAiImagePrediction
+  runAiImagePrediction,
+  saveAiImageReport
 } from "../src/services/cvImageService.js";
 
 /** Full Stage 2C response contract, exactly as produced by HeadPredictor. */
@@ -127,6 +137,7 @@ beforeEach(() => {
   petFindByIdMock.mockReset();
   assertPetAccessMock.mockReset();
   assertPetAccessMock.mockResolvedValue(undefined);
+  createAiReportMock.mockReset();
 });
 
 describe("headKeyForSpecies — Stage 2C head selection policy", () => {
@@ -323,3 +334,80 @@ describe("runAiImagePrediction", () => {
   });
 });
 
+describe("saveAiImageReport — persistence into shared AI Health Reports history", () => {
+  const payload = { petId: "507f191e810c19729de860ea", file: fileStub };
+
+  it("persists a mapped image assessment report", async () => {
+    createAiReportMock.mockResolvedValue({ _id: "report-1" });
+
+    const report = await saveAiImageReport(actor, payload as never, STAGE_2C_CONTRACT);
+    expect(createAiReportMock).toHaveBeenCalledTimes(1);
+
+    const mapped = createAiReportMock.mock.calls[0][1] as Record<string, any>;
+    // Assessment classification + type (image vs symptom).
+    expect(mapped.modality).toBe("image");
+    expect(mapped.petId).toBe(payload.petId);
+
+    // Shared required fields satisfied so list/detail/review work unchanged.
+    expect(String(mapped.aiSummary)).toContain("Preliminary AI image assessment");
+    expect(String(mapped.aiSummary)).toContain("computer-vision");
+    expect(String(mapped.aiSummary)).toContain("Veterinarian review is required");
+    expect(mapped.severity).toBe("high"); // High band -> high
+    expect(mapped.veterinarianReviewStatus).toBe("pending");
+    expect(mapped.modelVersion).toBe("vetflow-cv-v2.0.0-dev");
+
+    // Structured prediction mapping (compatible with existing consumers).
+    expect(mapped.prediction.predictedCondition).toBe("fungal");
+    expect(mapped.prediction.modelProbability).toBe(0.93);
+    expect(mapped.prediction.confidenceLevel).toBe("High");
+    expect(mapped.prediction.topPredictions[0]).toEqual({
+      condition: "fungal",
+      probability: 0.93
+    });
+    expect(mapped.prediction.probabilities).toEqual({
+      healthy: 0.05,
+      fungal: 0.93,
+      parasitic_mange: 0.02
+    });
+
+    // Full Stage 2C contract retained for detail/review rendering.
+    expect(mapped.imageAssessment).toEqual(STAGE_2C_CONTRACT);
+
+    // No file/temp path persisted; no uploaded-images duplication.
+    expect(mapped.uploadedImages).toEqual([]);
+    expect(mapped.symptoms).toEqual([]);
+    const serialized = JSON.stringify(mapped);
+    expect(serialized).not.toMatch(/\/tmp|\/Users|C:\\Users|\.jpg|\.png/);
+  });
+
+  it("maps a Moderate band to moderate severity and persists full breakdown", async () => {
+    createAiReportMock.mockResolvedValue({ _id: "report-2" });
+    const moderateContract = {
+      ...STAGE_2C_CONTRACT,
+      imageConfidence: { band: "Moderate", probability: 0.54 }
+    };
+
+    await saveAiImageReport(actor, payload as never, moderateContract);
+    const mapped = createAiReportMock.mock.calls[0][1] as Record<string, any>;
+    expect(mapped.severity).toBe("moderate");
+    expect(mapped.prediction.modelProbability).toBe(0.54);
+  });
+
+  it("preserves the preliminary / non-diagnostic safety language", async () => {
+    createAiReportMock.mockResolvedValue({ _id: "report-3" });
+    await saveAiImageReport(actor, payload as never, STAGE_2C_CONTRACT);
+    const mapped = createAiReportMock.mock.calls[0][1] as Record<string, any>;
+    const text = JSON.stringify(mapped);
+    expect(text).toContain("not a clinical diagnosis");
+    expect(text).toContain("Veterinarian review is required");
+    expect(mapped.imageAssessment).toBeDefined();
+  });
+
+  it("does not weaken or omit the required veterinarian-review flag", async () => {
+    createAiReportMock.mockResolvedValue({ _id: "report-4" });
+    await saveAiImageReport(actor, payload as never, STAGE_2C_CONTRACT);
+    const mapped = createAiReportMock.mock.calls[0][1] as Record<string, any>;
+    expect(mapped.imageAssessment.veterinarianReviewRequired).toBe(true);
+    expect(mapped.veterinarianReviewStatus).toBe("pending");
+  });
+});

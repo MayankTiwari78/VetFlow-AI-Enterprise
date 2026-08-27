@@ -18,6 +18,18 @@ export interface AIReport {
   veterinarianReviewStatus: AiReportReviewStatus;
   modelVersion: string;
   contractVersion: string;
+  /**
+   * Assessment modality. Existing symptom-based reports default to "symptom";
+   * Stage 2C image assessments are persisted as "image". Kept optional so the
+   * historical symptom reports remain unchanged.
+   */
+  modality?: "symptom" | "image";
+  /**
+   * Full Stage 2C structured contract for image assessments
+   * (modelModality / assessmentType / veterinarianReviewRequired / disclaimer /
+   * imageFindings / imageConfidence). Absent on symptom reports.
+   */
+  imageAssessment?: Record<string, unknown>;
   prediction: {
     predictedCondition: string;
     modelProbability: number;
@@ -57,6 +69,20 @@ const aiReportSchema = new mongoose.Schema<AIReport>(
       enum: AI_REPORT_REVIEW_STATUSES,
       default: "pending",
       index: true
+    },
+    // "symptom" (existing, default) or "image" (Stage 2C). Historical symptom
+    // reports are stored without this field and default to "symptom".
+    modality: {
+      type: String,
+      enum: ["symptom", "image"],
+      default: "symptom",
+      index: true
+    },
+    // Full Stage 2C structured contract persisted on image assessments.
+    // Absent (undefined) on symptom reports for backward compatibility.
+    imageAssessment: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined
     },
     modelVersion: { type: String, default: "vetflow-ml-v1.1.0-dev" },
     contractVersion: { type: String, default: "1.0.0" },

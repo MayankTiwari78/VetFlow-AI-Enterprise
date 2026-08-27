@@ -53,6 +53,7 @@ const pageTitles = {
 const getId = (item) => String(item?._id || item?.id || '')
 const asArray = (items) => Array.isArray(items) ? items : []
 const listText = (items) => asArray(items).join(', ')
+const formatPercent = (value) => `${Math.round((Number(value) || 0) * 100)}%`
 const parseList = (value) => [...new Set(String(value || '').split(',').map((item) => item.trim()).filter(Boolean))]
 const dateValue = (value) => value ? String(value).slice(0, 10) : ''
 const formatDate = (value) => {
@@ -428,22 +429,113 @@ const SettingsToggle = ({ checked, onChange }) => (
   </button>
 )
 
-const AiReportCard = ({ report }) => (
-  <article className='mf-card p-5'>
-    <div className='flex flex-wrap items-center justify-between gap-3'>
-      <p className='font-semibold text-ink'>Severity: <span className='capitalize text-primary'>{report.severity || 'unknown'}</span></p>
-      <p className='text-sm text-slate-500'>{formatDate(report.generatedAt || report.createdAt)}</p>
-    </div>
-    <p className='mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800'>This AI Report is a Preliminary Assessment and must not be considered a diagnosis.</p>
-    <div className='mt-4 grid gap-4 text-sm md:grid-cols-2'>
-      <div><p className='font-semibold text-slate-700'>Symptoms</p><p className='mt-1 text-slate-600'>{listText(report.symptoms) || 'Not recorded'}</p></div>
-      <div><p className='font-semibold text-slate-700'>Possible conditions</p><p className='mt-1 text-slate-600'>{listText(report.possibleConditions) || 'Not recorded'}</p></div>
-      <div className='md:col-span-2'><p className='font-semibold text-slate-700'>AI summary</p><p className='mt-1 leading-6 text-slate-600'>{report.aiSummary || 'No summary available'}</p></div>
-      <div className='md:col-span-2'><p className='font-semibold text-slate-700'>Recommendations</p><p className='mt-1 text-slate-600'>{listText(report.recommendations) || 'Not recorded'}</p></div>
-      <div className='md:col-span-2'><p className='font-semibold text-slate-700'>Uploaded images</p><div className='mt-2 flex flex-wrap gap-2'>{asArray(report.uploadedImages).length ? asArray(report.uploadedImages).map((src) => <a key={src} className='rounded-md border border-line px-3 py-2 text-xs font-semibold text-primary' href={src} target='_blank' rel='noreferrer'>View image</a>) : <span className='text-slate-600'>No images uploaded</span>}</div></div>
-    </div>
-  </article>
-)
+const reviewStatusLabel = (status) =>
+  status === 'reviewed' ? 'Reviewed by veterinarian' :
+  status === 'dismissed' ? 'Dismissed' : 'Pending veterinarian review'
+
+const AiReportCard = ({ report }) => {
+  const [expanded, setExpanded] = useState(false)
+  const isImage = report.modality === 'image'
+  const prediction = report.prediction ?? {}
+  const imageAssessment = isImage ? (report.imageAssessment ?? {}) : null
+  const findings = imageAssessment?.imageFindings ?? {}
+
+  // Structured report-detail data for both symptom and image reports.
+  const detailRows = [
+    isImage && ['Assessment type', 'Computer-vision image assessment (AI Image Assessment)'],
+    isImage && ['Model', `${findings.model_version || prediction.modelVersion || 'N/A'} · ${findings.backbone || 'N/A'} · ${findings.mode || 'N/A'}`],
+    ['Predicted condition', String(prediction.predictedCondition || 'Unknown').replace(/_/g, ' ')],
+    ['Confidence', `${prediction.confidenceLevel || 'Unknown'} (${formatPercent(prediction.modelProbability)})`],
+    ['Possible conditions', listText(report.possibleConditions) || 'Not recorded'],
+    ['AI summary', report.aiSummary || 'No summary available'],
+    ['Recommendations', listText(report.recommendations) || 'Not recorded'],
+    ['Review status', reviewStatusLabel(report.veterinarianReviewStatus)]
+  ].filter(Boolean)
+
+  const topConditions = isImage ? (findings.top_conditions ?? []) : (prediction.topPredictions ?? [])
+
+  return (
+    <article className='mf-card p-5'>
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className={`rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wide ${isImage ? 'bg-teal/10 text-teal' : 'bg-violet/10 text-violet'}`}>
+            {isImage ? 'AI image assessment' : 'Symptom assessment'}
+          </span>
+          <p className='text-sm font-semibold text-ink'>Severity: <span className='capitalize text-primary'>{report.severity || 'unknown'}</span></p>
+        </div>
+        <p className='text-sm text-slate-500'>{formatDate(report.generatedAt || report.createdAt)}</p>
+      </div>
+
+      <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
+        <span className={`rounded-full px-2.5 py-0.5 font-semibold ${report.veterinarianReviewStatus === 'reviewed' ? 'bg-emerald-100 text-emerald-800' : report.veterinarianReviewStatus === 'dismissed' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'}`}>
+          {reviewStatusLabel(report.veterinarianReviewStatus)}
+        </span>
+      </div>
+
+      <p className='mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800'>This AI Report is a Preliminary Assessment and must not be considered a diagnosis.</p>
+
+      <div className='mt-4 grid gap-4 text-sm md:grid-cols-2'>
+        {detailRows.map(([label, value]) => (
+          <div key={label} className={label === 'AI summary' ? 'md:col-span-2' : ''}>
+            <p className='font-semibold text-slate-700'>{label}</p>
+            <p className='mt-1 leading-6 text-slate-600'>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {expanded && (
+        <div className='mt-4 rounded-xl border border-line/70 bg-slate-50 p-4'>
+          <p className='text-sm font-semibold text-ink'>Report detail</p>
+
+          <div className='mt-3 grid gap-3 text-sm md:grid-cols-2'>
+            <div className='md:col-span-2'><p className='font-semibold text-slate-700'>Top conditions</p>
+              <ul className='mt-1 space-y-1 text-slate-600'>
+                {topConditions.length ? topConditions.map((item) => (
+                  <li key={item.class || item.condition}>
+                    {String(item.class || item.condition || '').replace(/_/g, ' ')} — {formatPercent(item.probability)}
+                  </li>
+                )) : <li className='text-slate-500'>No alternative conditions recorded.</li>}
+              </ul>
+            </div>
+
+            {isImage && (
+              <div className='md:col-span-2'>
+                <p className='font-semibold text-slate-700'>Full probability breakdown</p>
+                <ul className='mt-1 space-y-1 text-slate-600'>
+                  {Object.entries(findings.probabilities ?? {}).map(([label, value]) => (
+                    <li key={label}>{String(label).replace(/_/g, ' ')} — {formatPercent(value)}</li>
+                  ))}
+                  {!Object.keys(findings.probabilities ?? {}).length && <li className='text-slate-500'>No breakdown available.</li>}
+                </ul>
+              </div>
+            )}
+
+            {isImage && findings.temperature != null && (
+              <div className='md:col-span-2'>
+                <p className='font-semibold text-slate-700'>Model calibration</p>
+                <p className='mt-1 text-slate-600'>Calibrated: {String(findings.calibrated)} · temperature {findings.temperature.toFixed(2)}</p>
+              </div>
+            )}
+
+            {imageAssessment?.disclaimer && (
+              <p className='mt-2 text-xs italic text-slate-500 md:col-span-2'>{imageAssessment.disclaimer}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className='mt-4'>
+        <button
+          type='button'
+          className='text-sm font-semibold text-primary hover:text-teal'
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Hide report detail' : 'View report detail'}
+        </button>
+      </div>
+    </article>
+  )
+}
 
 const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const params = useParams()
@@ -1219,6 +1311,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
               backendUrl={backendUrl}
               token={token}
               pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
+              onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
             />
           )}
           {selectedPet && (
