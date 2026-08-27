@@ -10,6 +10,7 @@ import { useNavigate, useParams } from '../../lib/routerCompat'
 import { cleanVetName, normalizeDoctor } from '../../lib/veterinaryDisplay'
 import { getProfileImageSrc, isCustomProfileImage } from '../../lib/profileImage'
 import AiImageAssessment from './AiImageAssessment'
+import CombinedAssessment from './CombinedAssessment'
 import AiSymptomForm from './AiSymptomForm'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
@@ -436,14 +437,17 @@ const reviewStatusLabel = (status) =>
 const AiReportCard = ({ report }) => {
   const [expanded, setExpanded] = useState(false)
   const isImage = report.modality === 'image'
+  const isCombined = report.modality === 'combined'
   const prediction = report.prediction ?? {}
   const imageAssessment = isImage ? (report.imageAssessment ?? {}) : null
   const findings = imageAssessment?.imageFindings ?? {}
 
   // Structured report-detail data for both symptom and image reports.
   const detailRows = [
+    isCombined && ['Assessment type', 'Combined AI assessment (symptoms + image + history)'],
     isImage && ['Assessment type', 'Computer-vision image assessment (AI Image Assessment)'],
     isImage && ['Model', `${findings.model_version || prediction.modelVersion || 'N/A'} · ${findings.backbone || 'N/A'} · ${findings.mode || 'N/A'}`],
+    isCombined && ['Engine version', String(report.modelVersion || 'combined')],
     ['Predicted condition', String(prediction.predictedCondition || 'Unknown').replace(/_/g, ' ')],
     ['Confidence', `${prediction.confidenceLevel || 'Unknown'} (${formatPercent(prediction.modelProbability)})`],
     ['Possible conditions', listText(report.possibleConditions) || 'Not recorded'],
@@ -452,14 +456,23 @@ const AiReportCard = ({ report }) => {
     ['Review status', reviewStatusLabel(report.veterinarianReviewStatus)]
   ].filter(Boolean)
 
-  const topConditions = isImage ? (findings.top_conditions ?? []) : (prediction.topPredictions ?? [])
+  const combinedTop = isCombined
+    ? (report.combinedAssessment?.result?.topConditions ?? []).map((row) => ({
+        condition: row.condition,
+        probability: row.score,
+        source: row.source
+      }))
+    : null
+  const topConditions = combinedTop
+    ? combinedTop
+    : isImage ? (findings.top_conditions ?? []) : (prediction.topPredictions ?? [])
 
   return (
     <article className='mf-card p-5'>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='flex flex-wrap items-center gap-2'>
-          <span className={`rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wide ${isImage ? 'bg-teal/10 text-teal' : 'bg-violet/10 text-violet'}`}>
-            {isImage ? 'AI image assessment' : 'Symptom assessment'}
+          <span className={`rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wide ${isImage ? 'bg-teal/10 text-teal' : isCombined ? 'bg-indigo-500/10 text-indigo-600' : 'bg-violet/10 text-violet'}`}>
+            {isCombined ? 'Combined AI assessment' : isImage ? 'AI image assessment' : 'Symptom assessment'}
           </span>
           <p className='text-sm font-semibold text-ink'>Severity: <span className='capitalize text-primary'>{report.severity || 'unknown'}</span></p>
         </div>
@@ -491,8 +504,11 @@ const AiReportCard = ({ report }) => {
             <div className='md:col-span-2'><p className='font-semibold text-slate-700'>Top conditions</p>
               <ul className='mt-1 space-y-1 text-slate-600'>
                 {topConditions.length ? topConditions.map((item) => (
-                  <li key={item.class || item.condition}>
+                  <li key={`${item.class || item.condition}-${String(item.probability)}`}>
                     {String(item.class || item.condition || '').replace(/_/g, ' ')} — {formatPercent(item.probability)}
+                    {Array.isArray(item.source) && item.source.length > 0 && (
+                      <span className='ml-2 rounded bg-white px-1.5 py-0.5 text-xs font-semibold text-slate-500'>{item.source.join(' + ')}</span>
+                    )}
                   </li>
                 )) : <li className='text-slate-500'>No alternative conditions recorded.</li>}
               </ul>
@@ -1311,6 +1327,15 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
               backendUrl={backendUrl}
               token={token}
               pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
+              onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
+            />
+          )}
+          {selectedPet && (
+            <CombinedAssessment
+              backendUrl={backendUrl}
+              token={token}
+              pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
+              imageReports={(reports || []).filter((report) => report.modality === 'image')}
               onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
             />
           )}

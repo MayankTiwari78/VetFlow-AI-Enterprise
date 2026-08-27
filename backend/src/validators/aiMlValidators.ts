@@ -31,3 +31,23 @@ export const aiPredictionSaveSchema = aiPredictionSchema;
 export const cvImagePredictionSchema = z.object({
   petId: objectIdSchema
 });
+
+/**
+ * Stage 3 combined assessment request (JSON).
+ * At least one of `symptoms` or `imageReportId` must be present (enforced in
+ * the controller so the error is explicit and localized).
+ */
+export const combinedAssessmentSchema = z.object({
+  petId: objectIdSchema,
+  symptoms: z
+    .object({
+      Fever: symptomValueSchema,
+      Cough: symptomValueSchema,
+      Diarrhea: symptomValueSchema,
+      Lethargy: symptomValueSchema,
+      Loss_of_Appetite: symptomValueSchema
+    })
+    .strict()
+    .optional(),
+  imageReportId: objectIdSchema.optional()
+});

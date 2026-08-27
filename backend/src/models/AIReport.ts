@@ -23,7 +23,15 @@ export interface AIReport {
    * Stage 2C image assessments are persisted as "image". Kept optional so the
    * historical symptom reports remain unchanged.
    */
-  modality?: "symptom" | "image";
+  modality?: "symptom" | "image" | "combined";
+  /**
+   * Full Stage 3 combined assessment (fusion result + normalized inputs) for
+   * combined-modality reports. Absent on symptom/image reports.
+   */
+  combinedAssessment?: {
+    result: Record<string, unknown>;
+    inputs: Record<string, unknown>;
+  };
   /**
    * Full Stage 2C structured contract for image assessments
    * (modelModality / assessmentType / veterinarianReviewRequired / disclaimer /
@@ -70,13 +78,19 @@ const aiReportSchema = new mongoose.Schema<AIReport>(
       default: "pending",
       index: true
     },
-    // "symptom" (existing, default) or "image" (Stage 2C). Historical symptom
-    // reports are stored without this field and default to "symptom".
+    // "symptom" (existing, default), "image" (Stage 2C), or "combined" (Stage 3).
+    // Historical symptom reports are stored without this field and default to "symptom".
     modality: {
       type: String,
-      enum: ["symptom", "image"],
+      enum: ["symptom", "image", "combined"],
       default: "symptom",
       index: true
+    },
+    // Full Stage 3 combined assessment (fusion result + normalized inputs).
+    // Absent (undefined) on symptom/image reports for backward compatibility.
+    combinedAssessment: {
+      type: mongoose.Schema.Types.Mixed,
+      default: undefined
     },
     // Full Stage 2C structured contract persisted on image assessments.
     // Absent (undefined) on symptom reports for backward compatibility.

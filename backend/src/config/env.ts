@@ -69,7 +69,11 @@ const envSchema = z.object({
   ENABLE_API_DOCS: booleanFromEnv.default(false),
   DEVELOPMENT_AUTO_VERIFY_EMAIL: z.string().default("false"),
   CV_PYTHON_PATH: z.string().trim().optional(),
-  CV_STAGE2_ROOT: z.string().trim().optional()
+  CV_STAGE2_ROOT: z.string().trim().optional(),
+  // Stage 3 optional LLM narrative layer. Default OFF; the deterministic
+  // template provider is always available. When enabled, must be wired to a
+  // safe provider abstraction — never hard-coded keys here.
+  STAGE3_LLM_ENABLED: booleanFromEnv.default(false)
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
