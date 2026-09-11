@@ -1,0 +1,14 @@
+# =============================================================================
+# deploy/ — keep filled secret files OUT of Git; only templates (*.example)
+# are tracked.
+# =============================================================================
+
+# Compose interpolation vars (filled on the VM) — never commit.
+.env
+
+# Filled backend production environment (contains all secrets) — never commit.
+env/*.env.prod
+
+# Explicitly re-include the templates so they are always trackable.
+!env/*.env.prod.example
+!*.example
