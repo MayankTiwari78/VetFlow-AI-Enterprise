@@ -1,0 +1,31 @@
+# =============================================================================
+# Backend production image — Python inference dependencies (Stage 1 + Stage 2).
+# Installed into an isolated venv (/opt/ml-venv) by backend/Dockerfile.prod.
+# torch/torchvision resolve from the CPU wheel index passed on the pip CLI:
+#   --extra-index-url https://download.pytorch.org/whl/cpu
+# -----------------------------------------------------------------------------
+# These pins are VERIFIED against the actual artifacts in this repo:
+#   * vetflow_model_v1_1.pkl was persisted with scikit-learn 1.7.2 and the
+#     NumPy>=2.0 pickle layout (numpy._core). Pinning sklearn EXACTLY avoids
+#     InconsistentVersionWarning / unpickling drift.
+#   * torch/torchvision pins mirror reference-ml/stage2_cv/requirements-stage2.txt
+#     ("versions verified on this box").
+#   * matplotlib is REQUIRED on the Stage-2 inference path: the bridge imports
+#     evaluation.calibrate, which runs evaluation/__init__.py -> evaluation.metrics
+#     (which imports matplotlib). Omitting it makes Stage-2 fail with ImportError.
+# =============================================================================
+
+# --- Stage 1 (symptom LogisticRegression: backend/ml/ai_predict.py) ---
+scikit-learn==1.7.2
+numpy>=2.0,<3
+pandas>=2.0
+joblib>=1.3
+
+# --- Stage 2 (MobileNetV2 heads: reference-ml/stage2_cv, CPU inference) ---
+# If these exact +cpu builds are unavailable for the target CPU architecture,
+# install the matching torch/torchvision CPU pair from the same index — do NOT
+# change the model code to accommodate a different version.
+torch==2.13.0+cpu
+torchvision==0.28.0+cpu
+Pillow>=10.0
+matplotlib>=3.7

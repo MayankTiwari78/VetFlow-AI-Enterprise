@@ -1,0 +1,95 @@
+# =============================================================================
+# VetFlow-AI — PRODUCTION stack for a SINGLE VM (Docker Compose + Caddy).
+#
+#   caddy (:80/:443, automatic HTTPS via Let's Encrypt)
+#       -> app.<domain>    -> frontend:3000   (pet-owner Next.js)
+#       -> admin.<domain>  -> admin:3001      (vet/admin Next.js)
+#       -> api.<domain>    -> backend:4000    (Node/Express + Python inference)
+#
+#   MongoDB is Atlas (managed). There is deliberately NO mongo container and
+#   NO database port exposed. Only Caddy publishes 80/443.
+#
+# All three app hosts share ONE registrable domain (subdomains) => same-site =>
+# the refresh cookies work with COOKIE_SAME_SITE=lax (no SameSite=None needed).
+#
+# BEFORE `docker compose up`, on the VM:
+#   1. cp deploy/.env.example                deploy/.env                 && edit
+#   2. cp deploy/env/backend.env.prod.example deploy/env/backend.env.prod && edit
+#   3. Edit deploy/Caddyfile: real domain + email
+#   4. Ensure reference-ml/stage2_cv exists on the VM (STAGE2_CV_HOST_PATH)
+#   5. Allowlist the VM's fixed public IP in Atlas (see atlas-network-access.md)
+# Then, from the deploy/ directory:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# =============================================================================
+name: vetflow-prod
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    env_file:
+      - ./env/backend.env.prod
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      # Stage-2 CV code + weights are mounted read-only just below.
+      CV_STAGE2_ROOT: /opt/stage2_cv
+    volumes:
+      # host reference-ml/stage2_cv  ->  container /opt/stage2_cv (read-only).
+      # Default assumes reference-ml is a sibling of MedFlow-AI-Enterprise
+      # (as in the current workspace). Override STAGE2_CV_HOST_PATH in .env.
+      - ${STAGE2_CV_HOST_PATH:-../../reference-ml/stage2_cv}:/opt/stage2_cv:ro
+    expose:
+      - "4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        # NEXT_PUBLIC_* are baked into the client bundle at BUILD time.
+        NEXT_PUBLIC_BACKEND_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in deploy/.env}
+        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${PUBLIC_RAZORPAY_KEY_ID:-rzp_test_placeholder}
+    expose:
+      - "3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ../admin
+      args:
+        NEXT_PUBLIC_BACKEND_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL in deploy/.env}
+        NEXT_PUBLIC_CURRENCY: ${PUBLIC_CURRENCY:-INR}
+    expose:
+      - "3001"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+      - admin
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

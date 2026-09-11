@@ -1,0 +1,37 @@
+# =============================================================================
+# Caddy reverse proxy for the VetFlow-AI production stack.
+# Caddy automatically obtains & renews HTTPS certificates (Let's Encrypt).
+#
+# REPLACE:
+#   * example.com        -> your real registrable domain
+#   * admin@example.com  -> a real email (Let's Encrypt expiry notices)
+#
+# DNS: point three A records at the VM's fixed public IP:
+#   api.example.com    -> <VM_PUBLIC_IP>
+#   app.example.com    -> <VM_PUBLIC_IP>
+#   admin.example.com  -> <VM_PUBLIC_IP>
+#
+# Keeping all three on subdomains of ONE domain makes browser requests
+# "same-site", so the httpOnly refresh cookies (SameSite=lax) are sent
+# correctly between the web apps and the API. Do not split the API onto an
+# unrelated domain unless you also switch COOKIE_SAME_SITE=none (see docs).
+# =============================================================================
+
+{
+	email admin@example.com
+}
+
+# ---- Backend API ----
+api.example.com {
+	reverse_proxy backend:4000
+}
+
+# ---- Pet-owner web app ----
+app.example.com {
+	reverse_proxy frontend:3000
+}
+
+# ---- Veterinarian / admin console ----
+admin.example.com {
+	reverse_proxy admin:3001
+}

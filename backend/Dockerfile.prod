@@ -1,0 +1,63 @@
+# =============================================================================
+# VetFlow-AI backend — PRODUCTION image (Node API + Python ML/CV inference)
+# -----------------------------------------------------------------------------
+# WHY THIS FILE EXISTS (and why it does NOT replace the dev backend/Dockerfile):
+#   The backend calls Python OUT-OF-PROCESS for inference (unchanged design):
+#     * Stage 1  backend/ml/ai_predict.py        -> scikit-learn LogisticRegression
+#     * Stage 2  backend/ml/cv_predict_bridge.py -> torch/torchvision MobileNetV2
+#   The original alpine image shipped Node ONLY, so both stages crash in prod.
+#   This image adds a PINNED Python venv while keeping the exact architecture:
+#   Node still spawns Python via execFile. No model logic is modified.
+#
+#   Base is Debian bookworm-slim, NOT alpine: PyTorch CPU wheels are glibc
+#   builds and will not install on alpine/musl.
+#
+#   Stage-1 model (backend/ml/vetflow_model_v1_1.pkl) is committed -> COPYed in.
+#   Stage-2 weights (reference-ml/stage2_cv, ~70 MB, git-ignored) are NOT baked
+#   in; they are MOUNTED read-only at runtime by docker-compose.prod.yml at
+#   CV_STAGE2_ROOT=/opt/stage2_cv.
+# =============================================================================
+
+# ---- build stage: compile TypeScript -> dist/ ------------------------------
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# ---- runtime stage: Node server + Python inference venv --------------------
+FROM node:22-bookworm-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+
+# System Python + minimal tooling needed to install wheels.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Isolated ML venv. Debian marks system Python "externally managed" (PEP 668);
+# a venv is the clean, supported way to install our pinned deps.
+COPY ml-requirements.txt ./
+RUN python3 -m venv /opt/ml-venv \
+ && /opt/ml-venv/bin/pip install --no-cache-dir --upgrade pip \
+ && /opt/ml-venv/bin/pip install --no-cache-dir \
+      --extra-index-url https://download.pytorch.org/whl/cpu \
+      -r ml-requirements.txt
+
+# Production Node dependencies only.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Compiled server + Python bridge scripts + committed Stage-1 model.
+COPY --from=build /app/dist ./dist
+COPY ml ./ml
+
+# Point BOTH inference bridges at the venv interpreter (it has torch + sklearn).
+# CV_STAGE2_ROOT is provided at runtime (mounted volume), not baked here.
+ENV STAGE1_PYTHON_PATH=/opt/ml-venv/bin/python \
+    CV_PYTHON_PATH=/opt/ml-venv/bin/python
+
+EXPOSE 4000
+CMD ["node", "--enable-source-maps", "dist/server.js"]
