@@ -70,6 +70,10 @@ const envSchema = z.object({
   DEVELOPMENT_AUTO_VERIFY_EMAIL: z.string().default("false"),
   CV_PYTHON_PATH: z.string().trim().optional(),
   CV_STAGE2_ROOT: z.string().trim().optional(),
+  // Stage 1 symptom-ML interpreter override (production pinning). Optional:
+  // the runner falls back to "python"/"python3" on PATH and never relies on a
+  // shell, so no escaping/quoting is involved in the invocation.
+  STAGE1_PYTHON_PATH: z.string().trim().optional(),
   // Stage 3 optional LLM narrative layer. Default OFF; the deterministic
   // template provider is always available. When enabled, must be wired to a
   // safe provider abstraction — never hard-coded keys here.
