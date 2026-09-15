@@ -949,7 +949,8 @@ vi.mock("../src/models/Pet.js", () => ({ default: fakeDb.PetModel }));
 vi.mock("../src/models/AIReport.js", () => ({
   default: fakeDb.AIReportModel,
   AI_REPORT_SEVERITIES: ["low", "moderate", "high", "urgent"],
-  AI_REPORT_REVIEW_STATUSES: ["pending", "reviewed", "dismissed"]
+  AI_REPORT_REVIEW_STATUSES: ["pending", "reviewed", "dismissed"],
+  AI_REVIEW_DECISIONS: ["in_review", "approve", "modify", "dismiss", "consultation_requested"]
 }));
 vi.mock("bcrypt", () => ({
   default: {

@@ -45,6 +45,10 @@ const Sidebar = () => {
           <img className='min-w-5' src={assets.people_icon} alt='' />
           <p className='hidden md:block'>Pet Owners</p>
         </NavLink>
+        <NavLink to={'/veterinary-review-queue'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.appointment_icon} alt='' />
+          <p className='hidden md:block'>Review Queue</p>
+        </NavLink>
         <NavLink to={'/veterinary-pets'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.patients_icon} alt='' />
           <p className='hidden md:block'>Pets</p>
@@ -115,6 +119,10 @@ const Sidebar = () => {
         <NavLink to={'/veterinarian-ai-reports'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.list_icon} alt='' />
           <p className='hidden md:block'>AI Reports</p>
+        </NavLink>
+        <NavLink to={'/veterinary-review-queue'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
+          <img className='min-w-5' src={assets.appointment_icon} alt='' />
+          <p className='hidden md:block'>Review Queue</p>
         </NavLink>
         <NavLink to={'/security'} className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-3 md:min-w-64 cursor-pointer ${isActive ? 'bg-[#E7F4F5] font-semibold text-primary' : 'hover:bg-mist'}`}>
           <img className='min-w-5' src={assets.people_icon} alt='' />

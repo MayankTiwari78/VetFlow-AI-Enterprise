@@ -116,6 +116,16 @@ export const veterinarianCreateSchema = z.object({
 export const veterinarianUpdateSchema = veterinarianCreateSchema
   .omit({ doctorId: true })
   .partial()
+  .extend({
+    consultationAvailable: z.boolean().optional(),
+    location: z
+      .object({
+        lat: z.number().min(-90).max(90).optional(),
+        lng: z.number().min(-180).max(180).optional(),
+        address: z.string().trim().max(500).optional()
+      })
+      .optional()
+  })
   .refine(atLeastOneField, "Provide at least one field to update");
 
 export const vaccinationCreateSchema = z.object({
@@ -206,8 +216,87 @@ export const aiReportQuerySchema = veterinaryListQuerySchema.extend({
   petId: objectIdSchema.optional()
 });
 
-export const aiReportReviewUpdateSchema = z.object({
-  veterinarianReviewStatus: z.enum(AI_REPORT_REVIEW_STATUSES)
+/** Stage 4 — review queue filter (status/modal filter over AI reports). */
+export const reviewQueueQuerySchema = aiReportQuerySchema.extend({
+  status: z.enum(AI_REPORT_REVIEW_STATUSES).optional(),
+  modality: z.enum(["symptom", "image", "combined"]).optional(),
+  severity: z.enum(AI_REPORT_SEVERITIES).optional()
+});
+
+const finalAssessmentSchema = z
+  .object({
+    condition: boundedText(240),
+    diagnosis: optionalText(2000),
+    evidenceBand: z.string().trim().max(40).optional(),
+    summary: optionalText(4000)
+  })
+  .optional();
+
+/**
+ * Stage 4 — veterinarian decision payload.
+ *
+ * Backward compatible: the original `{ veterinarianReviewStatus }` body keeps
+ * working. New decision fields (decision / notes / finalAssessment) are
+ * validated strictly so client-supplied identity is never accepted.
+ */
+export const aiReportReviewUpdateSchema = z
+  .object({
+    veterinarianReviewStatus: z.enum(AI_REPORT_REVIEW_STATUSES).optional(),
+    decision: z.enum(["in_review", "approve", "modify", "dismiss", "consultation_requested"]).optional(),
+    notes: optionalText(5000),
+    consultationRequestNote: optionalText(5000),
+    finalAssessment: finalAssessmentSchema
+  })
+  .refine((value) => Object.values(value).some((item) => item !== undefined), "Provide a review update");
+
+export const prescriptionCreateSchema = z.object({
+  medicineName: boundedText(180),
+  dosage: boundedText(120),
+  frequency: boundedText(120),
+  duration: boundedText(120),
+  route: z.string().trim().max(160).default(""),
+  additionalInstructions: z.string().trim().max(4000).default("")
+});
+
+export const prescriptionQuerySchema = veterinaryListQuerySchema.extend({
+  petId: objectIdSchema.optional(),
+  aiReportId: objectIdSchema.optional()
+});
+
+export const prescriptionIdParamSchema = z.object({ prescriptionId: objectIdSchema });
+
+export const consultationRequestCreateSchema = z.object({
+  petId: objectIdSchema,
+  veterinarianId: objectIdSchema,
+  reason: boundedText(3000),
+  preferredDates: z.array(z.string().trim().max(40)).max(10).default([])
+});
+
+export const consultationRequestQuerySchema = veterinaryListQuerySchema.extend({
+  status: z.enum(["requested", "scheduled", "completed", "cancelled"]).optional()
+});
+
+export const consultationRequestUpdateSchema = z
+  .object({
+    status: z.enum(["requested", "scheduled", "completed", "cancelled"]),
+    notes: optionalText(4000)
+  })
+  .refine((value) => Object.values(value).some((item) => item !== undefined), "Provide a consultation update");
+
+export const consultationIdParamSchema = z.object({ consultationId: objectIdSchema });
+
+/**
+ * Stage 4 — nearby veterinarian discovery boundary.
+ * Coordinates come from the client's location permission; no fake/clinic data
+ * is ever injected server-side. Distance ordering only applies when both
+ * lat + lng are present.
+ */
+export const nearbyVeterinarianQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+  search: z.string().trim().max(120).default(""),
+  specialization: z.string().trim().max(120).optional()
 });
 
 export const petOwnerSearchQuerySchema = veterinaryListQuerySchema.extend({

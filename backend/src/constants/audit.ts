@@ -40,6 +40,14 @@ export const AUDIT_EVENT_TYPES = [
   "family_member.created",
   "family_member.removed",
   "health_card.viewed",
+  "ai_report.review_started",
+  "ai_report.approved",
+  "ai_report.modified",
+  "ai_report.dismissed",
+  "ai_report.consultation_requested",
+  "prescription.created",
+  "consultation.requested",
+  "consultation.status_changed",
   "admin.sensitive_action",
   "security.cross_tenant_denied"
 ] as const;

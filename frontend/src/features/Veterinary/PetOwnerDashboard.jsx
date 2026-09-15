@@ -12,6 +12,8 @@ import { getProfileImageSrc, isCustomProfileImage } from '../../lib/profileImage
 import AiImageAssessment from './AiImageAssessment'
 import CombinedAssessment from './CombinedAssessment'
 import AiSymptomForm from './AiSymptomForm'
+import VeterinarianReviewSection from './VeterinarianReviewSection'
+import { pretty, formatDateTime, reportTimestamp, sortNewestFirst, downloadTextFile, imageEvidenceText, symptomEvidenceText, buildCombinedReportText } from './reportUtils'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
 import { User, Bell, Shield, CreditCard, Globe, ChevronRight, KeyRound, Smartphone, Monitor, History, CheckCircle2, Sparkles, FileText, PawPrint, Settings } from 'lucide-react'
@@ -434,13 +436,16 @@ const reviewStatusLabel = (status) =>
   status === 'reviewed' ? 'Reviewed by veterinarian' :
   status === 'dismissed' ? 'Dismissed' : 'Pending veterinarian review'
 
-const AiReportCard = ({ report }) => {
+const AiReportCard = ({ report, pet, allReports = [] }) => {
   const [expanded, setExpanded] = useState(false)
   const isImage = report.modality === 'image'
   const isCombined = report.modality === 'combined'
   const prediction = report.prediction ?? {}
   const imageAssessment = isImage ? (report.imageAssessment ?? {}) : null
   const findings = imageAssessment?.imageFindings ?? {}
+  const combinedInputs = isCombined ? (report.combinedAssessment?.inputs ?? {}) : null
+  const combinedImageInput = combinedInputs?.image ?? null
+  const combinedSymptomInput = combinedInputs?.symptom ?? null
 
   // Structured report-detail data for both symptom and image reports.
   const detailRows = [
@@ -467,16 +472,44 @@ const AiReportCard = ({ report }) => {
     ? combinedTop
     : isImage ? (findings.top_conditions ?? []) : (prediction.topPredictions ?? [])
 
+  const downloadCombinedFromReport = () => {
+    if (!isCombined) return
+    const inputs = report.combinedAssessment?.inputs ?? {}
+    const imageInput = inputs.image
+    const imageSource = imageInput ? (allReports || []).find((r) => getId(r) === String(imageInput.imageReportId)) : null
+    const text = buildCombinedReportText({
+      pet,
+      capturedHistory: inputs.history,
+      symptom: { symptomKeys: report.symptoms || [], prediction: inputs.symptom, timestamp: reportTimestamp(report), reportId: getId(report) },
+      image: imageInput ? {
+        imageFindings: { predicted_class: imageInput.predictedClass, top_conditions: imageInput.topConditions },
+        imageConfidence: { band: imageInput.band, probability: imageInput.probability },
+        timestamp: reportTimestamp(imageSource) || reportTimestamp(report),
+        reportId: imageInput.imageReportId
+      } : null,
+      result: report.combinedAssessment?.result,
+      narrative: report.aiSummary,
+      timestamp: reportTimestamp(report),
+      reviewStatus: reviewStatusLabel(report.veterinarianReviewStatus),
+      evidenceUsed: [
+        'Pet history',
+        ...(inputs.symptom ? ['Symptom assessment'] : []),
+        ...(imageInput ? ['AI image assessment'] : [])
+      ]
+    })
+    downloadTextFile(`combined-ai-animal-health-report-${getId(report).slice(-8)}.txt`, text)
+  }
   return (
     <article className='mf-card p-5'>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='flex flex-wrap items-center gap-2'>
           <span className={`rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wide ${isImage ? 'bg-teal/10 text-teal' : isCombined ? 'bg-indigo-500/10 text-indigo-600' : 'bg-violet/10 text-violet'}`}>
-            {isCombined ? 'Combined AI assessment' : isImage ? 'AI image assessment' : 'Symptom assessment'}
+            {isCombined ? 'Combined AI Animal Health Report' : isImage ? 'AI image assessment' : 'Symptom assessment'}
+            {isCombined && <span className='rounded-md bg-indigo-600 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white'>PRIMARY RESULT</span>}
           </span>
           <p className='text-sm font-semibold text-ink'>Severity: <span className='capitalize text-primary'>{report.severity || 'unknown'}</span></p>
         </div>
-        <p className='text-sm text-slate-500'>{formatDate(report.generatedAt || report.createdAt)}</p>
+        <p className='text-sm text-slate-500'>{formatDateTime(reportTimestamp(report)) || 'unknown time'}</p>
       </div>
 
       <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
@@ -496,6 +529,33 @@ const AiReportCard = ({ report }) => {
         ))}
       </div>
 
+      {isCombined && (
+        <div className='mt-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4'>
+          <p className='text-sm font-semibold text-indigo-700'>Evidence used</p>
+          <div className='mt-2 grid gap-3 text-sm md:grid-cols-2'>
+            <div><p className='font-semibold text-slate-700'>Image assessment</p>
+              <p className='mt-0.5 text-slate-600'>
+                {combinedImageInput
+                  ? String(combinedImageInput.predictedClass || 'Unknown').replace(/_/g, ' ') +  ' — '  + (combinedImageInput.band || 'Unknown') + ' (' + formatPercent(combinedImageInput.probability) + ')'
+                  : 'No image evidence used'}
+              </p>
+            </div>
+            <div><p className='font-semibold text-slate-700'>Symptom model</p>
+              <p className='mt-0.5 text-slate-600'>
+              {combinedSymptomInput
+                  ? String(combinedSymptomInput.condition || 'Unknown').replace(/_/g, ' ') +  ' — '  + (combinedSymptomInput.confidenceLevel || 'Unknown')
+                  : 'Not used'}
+              </p>
+            </div>
+            <div><p className='font-semibold text-slate-700'>Pet history</p>
+              <p className='mt-0.5 text-slate-600'>Considered</p>
+            </div>
+            <div><p className='font-semibold text-slate-700'>Previous AI reports</p>
+              <p className='mt-0.5 text-slate-600'>Considered when applicable</p>
+            </div>
+          </div>
+        </div>
+      )}
       {expanded && (
         <div className='mt-4 rounded-xl border border-line/70 bg-slate-50 p-4'>
           <p className='text-sm font-semibold text-ink'>Report detail</p>
@@ -548,11 +608,132 @@ const AiReportCard = ({ report }) => {
         >
           {expanded ? 'Hide report detail' : 'View report detail'}
         </button>
+          {isCombined && (
+            <button type='button' className='ml-4 text-sm font-semibold text-primary hover:text-teal' onClick={downloadCombinedFromReport}>
+              Download Combined Report
+            </button>
+          )}
       </div>
     </article>
   )
 }
 
+const AiSymptomSupportCard = ({ report }) => {
+  const [expanded, setExpanded] = useState(false)
+  const prediction = report.prediction ?? {}
+  const stamp = reportTimestamp(report)
+  const downloadEvidence = () => {
+    const text = [
+      'MEDFLOW AI',
+      'Symptom Assessment — Supporting Evidence',
+      `Generated: ${formatDateTime(stamp) || 'unknown time'}`,
+      '--------------------------------------------',
+      '',
+      symptomEvidenceText({ symptomKeys: report.symptoms || [], prediction, timestamp: stamp, reportId: getId(report) }),
+      '',
+      listText(report.recommendations),
+      '',
+      'This is supporting AI evidence — not a diagnosis. Veterinarian review is required.'
+    ].join('\n')
+    downloadTextFile(`ai-symptom-evidence-${getId(report).slice(-8)}.txt`, text)
+  }
+  return (
+    <article className='rounded-lg border border-line/70 bg-white p-4'>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='rounded-md bg-violet/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-violet'>Supporting symptom evidence</span>
+          <p className='text-sm font-semibold text-slate-600'>{pretty(prediction.predictedCondition || 'Unknown')}</p>
+        </div>
+        <p className='text-xs text-slate-500'>{formatDateTime(stamp) || 'unknown time'}</p>
+      </div>
+      <p className='mt-2 text-xs italic text-slate-500'>Supporting AI evidence — not a diagnosis. Input used by the Combined AI Animal Health Report, not a standalone medical report.</p>
+      {expanded && (
+        <div className='mt-3 rounded-lg border border-line/70 bg-slate-50 p-3 text-sm'>
+          <div className='grid gap-3 md:grid-cols-2'>
+            <div><p className='font-semibold text-slate-700'>Symptoms</p>
+              <p className='mt-0.5 text-slate-600'>{listText(report.symptoms) || 'None recorded'}</p></div>
+            <div><p className='font-semibold text-slate-700'>Model finding</p>
+              <p className='mt-0.5 text-slate-600'>{pretty(prediction.predictedCondition || 'Unknown')} — {prediction.confidenceLevel || 'Unknown'}{prediction.modelProbability != null ? ' (' + formatPercent(prediction.modelProbability) + ')' : ''}</p></div>
+            <div className='md:col-span-2'><p className='font-semibold text-slate-700'>AI summary</p>
+              <p className='mt-0.5 text-slate-600'>{report.aiSummary || 'Not recorded'}</p></div>
+          </div>
+        </div>
+      )}
+      <div className='mt-2'>
+        <button type='button' className='text-sm font-semibold text-primary hover:text-teal' onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Hide evidence' : 'View evidence'}
+        </button>
+        <button type='button' className='ml-4 text-sm font-semibold text-primary hover:text-teal' onClick={downloadEvidence}>
+          Download symptom evidence
+        </button>
+      </div>
+    </article>
+  )
+}
+
+const AiImageSupportCard = ({ report }) => {
+  const [expanded, setExpanded] = useState(false)
+  const imageAssessment = report.imageAssessment ?? {}
+  const findings = imageAssessment.imageFindings ?? {}
+  const confidence = imageAssessment.imageConfidence ?? {}
+  const prediction = report.prediction ?? {}
+  const downloadEvidence = () => {
+    const stamp = reportTimestamp(report)
+    const text = [
+      'MEDFLOW AI',
+      'AI Image Assessment — Supporting Evidence',
+      `Generated: ${formatDateTime(stamp) || 'unknown time'}`,
+      '--------------------------------------------',
+      '',
+      imageEvidenceText({ imageFindings: findings, imageConfidence: confidence, prediction, timestamp: stamp, reportId: getId(report) }),
+      '',
+      'This is supporting AI evidence — not a diagnosis. Veterinarian review is required.'
+    ].join('\n')
+    downloadTextFile(`ai-image-evidence-${getId(report).slice(-8)}.txt`, text)
+  }
+  return (
+    <article className='rounded-lg border border-line/70 bg-white p-4'>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='rounded-md bg-teal/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-teal'>Supporting image evidence</span>
+          <p className='text-sm font-semibold text-slate-600'>
+            {String(findings.predicted_class ?? prediction.predictedCondition ?? 'Unknown').replace(/_/g, ' ')}
+          </p>
+        </div>
+        <p className='text-xs text-slate-500'>{formatDateTime(reportTimestamp(report)) || 'unknown time'}</p>
+      </div>
+      <p className='mt-2 text-xs italic text-slate-500'>Supporting AI image evidence— not a diagnosis. Input used by the Combined AI Assessment, not a standalone medical report.</p>
+      {expanded && (
+        <div className='mt-3 rounded-lg border border-line/70 bg-slate-50 p-3 text-sm'>
+          <div className='grid gap-3 md:grid-cols-2'>
+            <div><p className='font-semibold text-slate-700'>Predicted condition</p>
+              <p className='mt-0.5 text-slate-600'>{String(findings.predicted_class ?? 'Unknown').replace(/_/g, ' ')}</p></div>
+            <div><p className='font-semibold text-slate-700'>Model confidence</p>
+              <p className='mt-0.5 text-slate-600'>{confidence?.band ? confidence.band + ' (' + formatPercent(confidence.probability) + ')' : 'Unknown'}</p></div>
+            <div className='md:col-span-2'><p className='font-semibold text-slate-700'>Top conditions</p>
+              <ul className='mt-1 space-y-1 text-slate-600'>
+                {(findings.top_conditions ?? []).map((item) => (
+                  <li key={String(item.class)}>{String(item.class).replace(/_/g, ' ')} — {formatPercent(item.probability)}</li>
+                ))}
+                {!(findings.top_conditions ?? []).length && <li className='text-slate-500'>No alternative conditions recorded.</li>}
+              </ul>
+            </div>
+            <div className='md:col-span-2'><p className='font-semibold text-slate-700'>Model information</p>
+              <p className='mt-0.5 text-slate-600'>{findings.model_version || prediction.modelVersion || 'N/A'}{findings.backbone ? ' ' + findings.backbone : ''}</p></div>
+          </div>
+        </div>
+      )}
+      <div className='mt-2'>
+        <button type='button' className='text-sm font-semibold text-primary hover:text-teal' onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Hide image evidence' : 'View image evidence'}
+        </button>
+        <button type='button' className='ml-4 text-sm font-semibold text-primary hover:text-teal' onClick={downloadEvidence}>
+          Download image evidence
+        </button>
+      </div>
+    </article>
+  )
+}
 const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const params = useParams()
   const navigate = useNavigate()
@@ -606,14 +787,9 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
     if (!petPhotoPet || !petSelectedFile || petPhotoSaving) return
     setPetPhotoSaving(true)
     try {
-      const reader = new FileReader()
-      const dataUrl = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result)
-        reader.onerror = reject
-        reader.readAsDataURL(petSelectedFile)
-      })
-      const payload = buildPetPayload({ ...petToDraft(petPhotoPet), profileImage: dataUrl })
-      await axios.put(`${backendUrl}/api/v1/veterinary/pets/${getId(petPhotoPet)}`, payload, authConfig(token))
+      const formData = new FormData()
+      formData.append('image', petSelectedFile)
+      await axios.post(`${backendUrl}/api/v1/veterinary/pets/${getId(petPhotoPet)}/photo`, formData, authConfig(token))
       toast.success('Pet photo updated')
       setPetPreview(null)
       setPetSelectedFile(null)
@@ -633,8 +809,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
     if (!confirmed) return
     setPetPhotoSaving(true)
     try {
-      const payload = buildPetPayload({ ...petToDraft(pet), profileImage: '' })
-      await axios.put(`${backendUrl}/api/v1/veterinary/pets/${getId(pet)}`, payload, authConfig(token))
+      await axios.delete(`${backendUrl}/api/v1/veterinary/pets/${getId(pet)}/photo`, authConfig(token))
       toast.success('Pet photo removed')
       await loadAll()
     } catch (requestError) {
@@ -1236,7 +1411,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
             <StatCard label='Pets' value={pets.length} detail='Registered pet profiles' />
             <StatCard label='Vaccinations' value={vaccinations.length} detail='Recent and upcoming vaccine records' />
             <StatCard label='Pet medical records' value={records.length} detail='Latest records for selected pet' />
-            <StatCard label='AI reports' value={reports.length} detail='Preliminary assessment reports' />
+            <StatCard label='AI reports' value={(reports || []).filter((r) => r.modality === 'combined').length} detail='Combined AI Animal Health Reports' />
           </div>
           <section>
             <div className='mb-3 flex items-center justify-between'><h2 className='text-xl font-semibold text-ink'>Pet summary</h2><button className='text-sm font-semibold text-primary' onClick={() => navigate('/pet-owner/pets')}>View all</button></div>
@@ -1244,7 +1419,7 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
           </section>
           <div className='grid gap-5 lg:grid-cols-2'>
             <section><h2 className='mb-3 text-xl font-semibold text-ink'>Vaccination summary</h2><DataTable columns={vaccinationColumns.slice(0, 4)} rows={vaccinations.slice(0, 5)} emptyTitle='No vaccination records yet.' /></section>
-            <section><h2 className='mb-3 text-xl font-semibold text-ink'>AI report summary</h2><div className='space-y-3'>{reports.slice(0, 2).map((report) => <AiReportCard key={getId(report)} report={report} />)}{reports.length === 0 && <EmptyState title='No AI reports yet' body='Preliminary reports will appear here after they are created.' />}</div></section>
+            <section><h2 className='mb-3 text-xl font-semibold text-ink'>AI report summary</h2><div className='space-y-3'>{sortNewestFirst((reports || []).filter((r) => r.modality === 'combined')).slice(0, 1).map((report) => <AiReportCard key={getId(report)} report={report} pet={selectedPet} allReports={reports} />)}{(reports || []).filter((r) => r.modality === 'combined').length === 0 && <EmptyState title='No Combined AI Animal Health Report yet' body='Run the Combined Assessment in AI Health Reports to generate your final preliminary report. Image and symptom evidence are saved as supporting inputs.' />}</div></section>
           </div>
         </div>
       )}
@@ -1306,7 +1481,20 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
           </section>
           <section><h2 className='mb-3 text-xl font-semibold text-ink'>Previous visits</h2><DataTable columns={recordColumns} rows={records} emptyTitle='No pet medical records found.' /></section>
           <section><h2 className='mb-3 text-xl font-semibold text-ink'>Vaccination history</h2><DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' /></section>
-          <section><h2 className='mb-3 text-xl font-semibold text-ink'>AI preliminary assessment reports</h2><div className='space-y-4'>{reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}{reports.length === 0 && <EmptyState title='No AI reports' body='AI preliminary assessment reports for this pet will appear here.' />}</div></section>
+          <section><h2 className='mb-3 text-xl font-semibold text-ink'>AI preliminary assessment reports</h2><div className='space-y-4'>
+  {sortNewestFirst((reports || []).filter((r) => r.modality === 'combined')).map((report) => <AiReportCard key={getId(report)} report={report} pet={selectedPet} allReports={reports} />)}
+  {reports.length === 0 && <EmptyState title='No AI reports' body='AI preliminary assessment reports for this pet will appear here.' />}
+  {(reports || []).filter((r) => r.modality === 'image').length > 0 && (
+    <div>
+      <p className='text-sm font-bold text-slate-700'>Supporting AI evidence</p>
+      <p className='mt-0.5 text-xs text-slate-500'>Saved image and symptom assessments used as inputs by the Combined AI Animal Health Report. These are evidence, not a diagnosis.</p>
+      <div className='mt-3 space-y-3'>
+        {sortNewestFirst((reports || []).filter((r) => r.modality === 'image')).map((report) => <AiImageSupportCard key={getId(report)} report={report} />)}
+                  {sortNewestFirst((reports || []).filter((r) => r.modality !== 'image' && r.modality !== 'combined')).map((report) => <AiSymptomSupportCard key={getId(report)} report={report} />)}
+      </div>
+    </div>
+  )}
+</div></section>
         </div>
       )}
 
@@ -1322,34 +1510,113 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
       {view === 'ai' && (
         <div className='space-y-6'>
+          {/* STEP 1 — Pet information (input, not a report) */}
+          <section className='mf-card p-5'>
+            <p className='text-xs font-bold uppercase tracking-wide text-teal'>Step 1 &mdash; Provide pet information</p>
+            {selectedPet ? (
+              <div className='mt-3 flex flex-wrap items-end justify-between gap-3'>
+                <div>
+                  <p className='text-base font-semibold text-ink'>{selectedPet.name}</p>
+                  <p className='text-sm text-slate-600'>
+                    {[selectedPet.species, selectedPet.breed, selectedPet.age != null && selectedPet.age !== '' ? selectedPet.age + ' yr' : '', selectedPet.gender]
+                      .filter(Boolean).join(' · ') || 'Profile details pending'}
+                  </p>
+                  <p className='mt-1 text-xs text-slate-500'>
+                    Pet history (species, breed, age, allergies, prior AI reports) is used as evidence in the combined assessment.
+                  </p>
+                </div>
+                {pets.length > 1 && (
+                  <label className='mf-label'>
+                    Switch pet
+                    <select
+                      className='mf-field mt-1'
+                      value={getId(selectedPet)}
+                      onChange={(event) => {
+                        const next = pets.find((p) => getId(p) === event.target.value)
+                        if (next) { setSelectedPet(next); void loadPetCollections(getId(next)) }
+                      }}
+                    >
+                      {pets.map((p) => <option key={getId(p)} value={getId(p)}>{p.name} ({p.species})</option>)}
+                    </select>
+                  </label>
+                )}
+              </div>
+            ) : (
+              <p className='mt-2 text-sm text-slate-600'>Register or select a pet to begin an assessment.</p>
+            )}
+          </section>
+
+          {/* STEP 2 - AI image assessment / image evidence (fully visible; feeds the combined result) */}
           {selectedPet && (
-            <AiImageAssessment
-              backendUrl={backendUrl}
-              token={token}
-              pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
-              onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
-            />
+            <section className='space-y-2'>
+              <p className='text-xs font-bold uppercase tracking-wide text-teal'>Step 2 &mdash; AI image assessment / image evidence</p>
+              <AiImageAssessment
+                backendUrl={backendUrl}
+                token={token}
+                pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
+                onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
+              />
+            </section>
           )}
+
+          {/* STEPS 3-4 - Combined AI Preliminary Assessment [PRIMARY RESULT] */}
           {selectedPet && (
-            <CombinedAssessment
-              backendUrl={backendUrl}
-              token={token}
-              pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
-              imageReports={(reports || []).filter((report) => report.modality === 'image')}
-              onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
-            />
+            <section className='rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4'>
+              <div className='mb-1 flex flex-wrap items-center justify-between gap-2'>
+                <p className='text-xs font-bold uppercase tracking-wide text-indigo-700'>Steps 3&ndash;4 &mdash; Combined AI Preliminary Assessment</p>
+                <span className='rounded-md bg-indigo-600 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white'>Primary result</span>
+              </div>
+              <CombinedAssessment
+                backendUrl={backendUrl}
+                token={token}
+                pet={{ id: getId(selectedPet), species: selectedPet.species, name: selectedPet.name }}
+                imageReports={(reports || []).filter((report) => report.modality === 'image')}
+                onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
+              />
+            </section>
           )}
+
+          {/* Underlying symptom model - supporting evidence, never a competing final report */}
           {selectedPet && (
-            <AiSymptomForm
-              backendUrl={backendUrl}
-              token={token}
-              petId={getId(selectedPet)}
-              onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
-            />
+            <details className='rounded-lg border border-line/70 bg-white p-4'>
+              <summary className='cursor-pointer text-sm font-semibold text-slate-700'>Symptom model (underlying symptom evidence)</summary>
+              <div className='mt-4'>
+              <AiSymptomForm
+                  backendUrl={backendUrl}
+                  token={token}
+                  petId={getId(selectedPet)}
+                  onReportSaved={() => { void loadPetCollections(getId(selectedPet)) }}
+                />
+              </div>
+            </details>
           )}
+
           <div className='space-y-4'>
-            {reports.map((report) => <AiReportCard key={getId(report)} report={report} />)}
-            {reports.length === 0 && <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />}
+            <p className='text-xs font-bold uppercase tracking-wide text-teal'>Primary AI report history</p>
+            {sortNewestFirst((reports || []).filter((r) => r.modality === 'combined')).map((report) => (
+              <div key={getId(report)} className='space-y-3'>
+                <AiReportCard report={report} pet={selectedPet} allReports={reports} />
+                <VeterinarianReviewSection
+                  report={report}
+                  backendUrl={backendUrl}
+                  token={token}
+                  onReviewRequested={() => { if (getId(selectedPet)) void loadPetCollections(getId(selectedPet)) }}
+                />
+              </div>
+            ))}
+            {reports.length === 0 && (
+              <EmptyState title='No AI reports' body='Preliminary assessment reports will appear here.' />
+            )}
+            {(reports || []).filter((r) => r.modality === 'image').length > 0 && (
+              <section>
+                <p className='text-sm font-bold text-slate-700'>Supporting AI evidence</p>
+                <p className='mt-0.5 text-xs text-slate-500'>Saved image and symptom assessments used as inputs by the Combined AI Animal Health Report. These are evidence, not a diagnosis.</p>
+                <div className='mt-3 space-y-3'>
+                  {sortNewestFirst((reports || []).filter((r) => r.modality === 'image')).map((report) => <AiImageSupportCard key={getId(report)} report={report} />)}
+                  {sortNewestFirst((reports || []).filter((r) => r.modality !== 'image' && r.modality !== 'combined')).map((report) => <AiSymptomSupportCard key={getId(report)} report={report} />)}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       )}

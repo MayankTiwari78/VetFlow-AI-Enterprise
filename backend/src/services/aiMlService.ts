@@ -9,6 +9,7 @@ import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 import AIReportModel from "../models/AIReport.js";
 import PetModel from "../models/Pet.js";
+import PetOwnerModel from "../models/PetOwner.js";
 import { AppError } from "../utils/AppError.js";
 
 const execFileAsync = promisify(execFile);
@@ -199,6 +200,13 @@ const assertPetAccess = async (actor: VeterinaryActor, petId: string): Promise<v
   }
   if (actor.accountType === "patient") {
     requireAnyPermission(actor, ["users:manage"]);
+    // Data isolation: a patient may only run/save AI assessments for pets they
+    // own. The owner profile is resolved from the authenticated account — the
+    // client-supplied petId can never point at another user's pet.
+    const owner = await PetOwnerModel.findOne({ userId: actor.accountId });
+    if (!owner || String(pet.ownerId) !== String(owner._id)) {
+      throw new AppError("Pet not found", 404);
+    }
     return;
   }
   throw new AppError("Pet not found", 404);

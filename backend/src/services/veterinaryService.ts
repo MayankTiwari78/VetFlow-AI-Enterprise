@@ -1,6 +1,15 @@
 import type { AccountType } from "../constants/auth.js";
+import type { AuditEventType } from "../constants/audit.js";
 import type { EnterpriseRole, Permission } from "../constants/rbac.js";
-import AIReportModel from "../models/AIReport.js";
+import type {
+  AiReportReviewStatus,
+  AiReviewDecision
+} from "../models/AIReport.js";
+import AIReportModel, {
+  AI_REPORT_REVIEW_STATUSES,
+  AI_REVIEW_DECISIONS
+} from "../models/AIReport.js";
+import ConsultationRequestModel from "../models/ConsultationRequest.js";
 import DoctorModel from "../models/Doctor.js";
 import PetModel from "../models/Pet.js";
 import PetMedicalRecordModel from "../models/PetMedicalRecord.js";
@@ -8,7 +17,11 @@ import PetOwnerModel from "../models/PetOwner.js";
 import UserModel from "../models/User.js";
 import VaccinationModel from "../models/Vaccination.js";
 import VeterinarianModel from "../models/Veterinarian.js";
+import VeterinaryPrescriptionModel from "../models/VeterinaryPrescription.js";
 import { AppError } from "../utils/AppError.js";
+import { writeAuditLog } from "./auditService.js";
+import { uploadImageToCloudinary } from "./uploadService.js";
+import { DEFAULT_PET_IMAGE } from "../constants/defaults.js";
 
 export interface VeterinaryActor {
   accountId: string;
@@ -95,8 +108,52 @@ type AiReportPayload = {
   generatedAt: Date;
 };
 
-type AiReportReviewPayload = {
-  veterinarianReviewStatus: "pending" | "reviewed" | "dismissed";
+type ReviewDecisionPayload = {
+  veterinarianReviewStatus?: AiReportReviewStatus;
+  decision?: AiReviewDecision;
+  notes?: string;
+  consultationRequestNote?: string;
+  finalAssessment?: {
+    condition: string;
+    diagnosis?: string;
+    evidenceBand?: string;
+    summary?: string;
+  };
+};
+
+type ReviewQueueQuery = ListingQuery & {
+  status?: AiReportReviewStatus;
+  modality?: "symptom" | "image" | "combined";
+  severity?: "low" | "moderate" | "high" | "urgent";
+};
+
+type PrescriptionPayload = {
+  medicineName: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  route?: string;
+  additionalInstructions?: string;
+};
+
+type ConsultationRequestPayload = {
+  petId: string;
+  veterinarianId: string;
+  reason: string;
+  preferredDates?: string[];
+};
+
+type ConsultationUpdatePayload = {
+  status: "requested" | "scheduled" | "completed" | "cancelled";
+  notes?: string;
+};
+
+type NearbyVeterinarianQuery = {
+  lat?: number;
+  lng?: number;
+  limit?: number;
+  search?: string;
+  specialization?: string;
 };
 
 type ListingQuery = {
@@ -123,6 +180,11 @@ type Pagination = {
   total: number;
   pages: number;
 };
+
+type ReviewPopulate =
+  | string
+  | { path: string; select?: string; populate?: { path: string; select?: string } }
+  | Array<string | { path: string; select?: string; populate?: { path: string; select?: string } }>;
 
 type PaginatedResult<T> = {
   items: T[];
@@ -184,10 +246,7 @@ const paginate = async <T>(
   query: ListingQuery,
   allowedSortFields: readonly string[],
   fallbackSort = "-createdAt",
-  populate?:
-    | string
-    | { path: string; populate?: { path: string; select?: string } }
-    | Array<string | { path: string; populate?: { path: string; select?: string } }>
+  populate?: ReviewPopulate
 ): Promise<PaginatedResult<T>> => {
   const options = listOptions(query);
   const skip = (options.page - 1) * options.limit;
@@ -634,6 +693,40 @@ export const updatePet = async (
   return pet;
 };
 
+export const updatePetPhoto = async (
+  actor: VeterinaryActor,
+  petId: string,
+  file: Express.Multer.File
+) => {
+  requireAnyPermission(actor, ["users:manage"]);
+  await assertPetAccess(actor, petId, "manage");
+
+  const profileImage = await uploadImageToCloudinary(file.path, {
+    developmentFallbackUrl: DEFAULT_PET_IMAGE
+  });
+
+  const pet = await PetModel.findByIdAndUpdate(
+    petId,
+    { profileImage },
+    { new: true, runValidators: true }
+  );
+  if (!pet) throw new AppError("Pet not found", 404);
+  return pet;
+};
+
+export const deletePetPhoto = async (actor: VeterinaryActor, petId: string) => {
+  requireAnyPermission(actor, ["users:manage"]);
+  await assertPetAccess(actor, petId, "manage");
+
+  const pet = await PetModel.findByIdAndUpdate(
+    petId,
+    { profileImage: "" },
+    { new: true, runValidators: true }
+  );
+  if (!pet) throw new AppError("Pet not found", 404);
+  return pet;
+};
+
 export const deletePet = async (actor: VeterinaryActor, petId: string): Promise<void> => {
   requireAnyPermission(actor, ["users:manage"]);
   await assertPetAccess(actor, petId, "manage");
@@ -842,6 +935,13 @@ const vaccinationScopeFilter = async (
   const base: Record<string, unknown> = { isDeleted: { $ne: true } };
   if (petId) {
     base.petId = petId;
+  } else if (!isAdmin(actor) && actor.accountType === "patient") {
+    // Data isolation: without an explicit (ownership-checked) pet filter, a
+    // patient may only ever see vaccinations for their own pets. The owner
+    // profile is derived from the authenticated account.
+    const owner = await ownPetOwner(actor);
+    const pets = await PetModel.find({ ownerId: documentId(owner) }).select("_id");
+    base.petId = pets.length ? { $in: pets.map((pet) => pet._id) } : { $in: [] };
   }
 
   if (actor.accountType === "doctor" && !isAdmin(actor)) {
@@ -856,9 +956,9 @@ export const getVaccinationById = async (
   vaccinationId: string
 ): Promise<unknown> => {
   requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
-  const vaccination = await VaccinationModel.findById(vaccinationId)
-    .populate(VACCINATION_POPULATE)
-    .populate(VACCINATION_PET_POPULATE);
+  // Ownership is verified on the raw petId before populating: populating petId
+  // replaces it with a document, which would break the access check.
+  const vaccination = await VaccinationModel.findById(vaccinationId);
   if (!vaccination || vaccination.isDeleted) {
     throw new AppError("Vaccination not found", 404);
   }
@@ -873,7 +973,9 @@ export const getVaccinationById = async (
     await assertPetAccess(actor, String(vaccination.petId), "read");
   }
 
-  return vaccination;
+  return VaccinationModel.findById(vaccinationId)
+    .populate(VACCINATION_POPULATE)
+    .populate(VACCINATION_PET_POPULATE);
 };
 
 export const getVaccinationStats = async (
@@ -1141,19 +1243,183 @@ export const deleteAiReport = async (actor: VeterinaryActor, reportId: string): 
 export const updateAiReportReviewStatus = async (
   actor: VeterinaryActor,
   reportId: string,
-  payload: AiReportReviewPayload
+  payload: ReviewDecisionPayload
 ) => {
   requireAnyPermission(actor, ["appointments:update"]);
   const report = await AIReportModel.findById(reportId);
   if (!report) throw new AppError("AI report not found", 404);
   await assertPetAccess(actor, String(report.petId), actor.accountType === "doctor" ? "read" : "manage");
-  const updated = await AIReportModel.findByIdAndUpdate(
-    reportId,
-    { veterinarianReviewStatus: payload.veterinarianReviewStatus },
-    { new: true, runValidators: true }
-  );
+
+  // Defense-in-depth: the route layer validates with zod; the service does the
+  // same so no invalid decision/status can ever reach the persistence layer.
+  if (
+    payload.decision !== undefined &&
+    !(AI_REVIEW_DECISIONS as readonly string[]).includes(payload.decision)
+  ) {
+    throw new AppError("Invalid review decision", 400);
+  }
+  if (
+    payload.veterinarianReviewStatus !== undefined &&
+    !(AI_REPORT_REVIEW_STATUSES as readonly string[]).includes(payload.veterinarianReviewStatus)
+  ) {
+    throw new AppError("Invalid review status", 400);
+  }
+
+  const previousStatus = report.veterinarianReviewStatus ?? "pending";
+  const resolvedStatus: AiReportReviewStatus =
+    payload.veterinarianReviewStatus ??
+    deriveStatusFromDecision(payload.decision, previousStatus);
+  const resolvedDecision: AiReviewDecision =
+    payload.decision ?? deriveDecisionFromStatus(resolvedStatus);
+
+  if (
+    (resolvedStatus === "approved" || resolvedStatus === "modified") &&
+    !payload.finalAssessment?.condition
+  ) {
+    throw new AppError(
+      "A final veterinarian assessment (condition) is required when approving or overriding an AI report",
+      400
+    );
+  }
+
+  const reviewer = await resolveReviewerIdentity(actor);
+  const now = new Date();
+
+  // The update NEVER touches `prediction` / `combinedAssessment` /
+  // `imageAssessment` — the original AI result stays immutable.
+  const update: Record<string, unknown> = { veterinarianReviewStatus: resolvedStatus };
+  const reviewPath = "veterinarianReview.";
+
+  if (resolvedStatus === "in_review") {
+    update[`${reviewPath}startedAt`] = report.veterinarianReview?.startedAt ?? now;
+    update[`${reviewPath}previousStatus`] = previousStatus;
+    update[`${reviewPath}decision`] = "in_review";
+    update[`${reviewPath}status`] = "in_review";
+  } else {
+    update[`${reviewPath}veterinarianId`] = reviewer.veterinarianId ?? null;
+    update[`${reviewPath}reviewerAccountId`] = actor.accountId;
+    update[`${reviewPath}reviewerAccountType`] = actor.accountType;
+    update[`${reviewPath}reviewerName`] = reviewer.reviewerName;
+    update[`${reviewPath}reviewedAt`] = now;
+    update[`${reviewPath}previousStatus`] = previousStatus;
+    update[`${reviewPath}decision`] = resolvedDecision;
+    update[`${reviewPath}status`] = resolvedStatus;
+    update[`${reviewPath}aiPredictionSnapshot`] = {
+      predictedCondition: String(report.prediction?.predictedCondition ?? ""),
+      modelProbability: Number(report.prediction?.modelProbability ?? 0),
+      confidenceLevel: String(report.prediction?.confidenceLevel ?? ""),
+      modality: report.modality ?? "symptom"
+    };
+    if (payload.notes !== undefined) update[`${reviewPath}notes`] = payload.notes;
+    if (payload.consultationRequestNote !== undefined) {
+      update[`${reviewPath}consultationRequestNote`] = payload.consultationRequestNote;
+    }
+    if (payload.finalAssessment) update[`${reviewPath}finalAssessment`] = payload.finalAssessment;
+  }
+
+  const updated = await AIReportModel.findByIdAndUpdate(reportId, update, {
+    new: true,
+    runValidators: true
+  });
   if (!updated) throw new AppError("AI report not found", 404);
+
+  // Auditable trail: who, when, previous status, what the AI predicted, and
+  // what the veterinarian decided. Audit capture failure never breaks the review.
+  await writeAuditLog({
+    eventType: REVIEW_EVENT_BY_STATUS[resolvedStatus] as AuditEventType,
+    actor: { accountId: actor.accountId, accountType: actor.accountType, role: actor.role },
+    target: { type: "ai_report", id: reportId },
+    metadata: {
+      previousStatus,
+      status: resolvedStatus,
+      decision: resolvedDecision,
+      hasNotes: Boolean(payload.notes),
+      hasFinalAssessment: Boolean(payload.finalAssessment),
+      aiPredictionSnapshot: {
+        predictedCondition: String(report.prediction?.predictedCondition ?? ""),
+        confidenceLevel: String(report.prediction?.confidenceLevel ?? "")
+      }
+    }
+  }).catch(() => undefined);
+
   return updated;
+};
+
+const REVIEW_EVENT_BY_STATUS: Record<string, string> = {
+  in_review: "ai_report.review_started",
+  approved: "ai_report.approved",
+  modified: "ai_report.modified",
+  dismissed: "ai_report.dismissed",
+  consultation_required: "ai_report.consultation_requested",
+  reviewed: "ai_report.approved"
+};
+
+const deriveDecisionFromStatus = (status: AiReportReviewStatus): AiReviewDecision => {
+  switch (status) {
+    case "in_review":
+      return "in_review";
+    case "approved":
+    case "reviewed":
+      return "approve";
+    case "modified":
+      return "modify";
+    case "dismissed":
+      return "dismiss";
+    case "consultation_required":
+      return "consultation_requested";
+    default:
+      throw new AppError("A review decision is required", 400);
+  }
+};
+
+const deriveStatusFromDecision = (
+  decision: AiReviewDecision | undefined,
+  fallback: AiReportReviewStatus
+): AiReportReviewStatus => {
+  switch (decision) {
+    case "in_review":
+      return "in_review";
+    case "approve":
+      return "approved";
+    case "modify":
+      return "modified";
+    case "dismiss":
+      return "dismissed";
+    case "consultation_requested":
+      return "consultation_required";
+    default:
+      return fallback;
+  }
+};
+
+/**
+ * Reviewer identity is ALWAYS derived from the authenticated session — never
+ * from the request body. Doctors resolve their veterinarians profile + name;
+ * admins review as "Hospital Administrator".
+ */
+const resolveReviewerIdentity = async (actor: VeterinaryActor): Promise<{
+  veterinarianId?: string;
+  reviewerName: string;
+}> => {
+  if (actor.accountType === "doctor") {
+    const [veterinarian, doctor] = await Promise.all([
+      VeterinarianModel.findOne({ doctorId: actor.accountId }),
+      DoctorModel.findById(actor.accountId)
+    ]);
+    return {
+      veterinarianId: veterinarian ? documentId(veterinarian) : undefined,
+      reviewerName: doctor?.name ? String(doctor.name) : "Veterinarian"
+    };
+  }
+
+  return { veterinarianId: undefined, reviewerName: "Hospital Administrator" };
+};
+
+const ownPatientUserId = async (actor: VeterinaryActor): Promise<string> => {
+  if (actor.accountType !== "patient") {
+    throw new AppError("Only pet owner accounts can request consultations", 403);
+  }
+  return actor.accountId;
 };
 
 export const getVeterinaryDashboardStats = async (
@@ -1238,4 +1504,410 @@ export const getVeterinaryDashboardSummary = async (
     preliminaryAssessmentNotice:
       "AI reports are preliminary assessment reports only and are not a diagnosis."
   };
+};
+
+/** Stage 4 — veterinarian-facing review queue (combined reports primary). */
+export const listVeterinarianReviewQueue = async (
+  actor: VeterinaryActor,
+  query: ReviewQueueQuery = {}
+): Promise<PaginatedResult<unknown>> => {
+  requireAnyPermission(actor, ["reports:read", "appointments:read"]);
+
+  const search = textSearch(listOptions(query).search, ["aiSummary", "possibleConditions", "symptoms"]);
+  const statusFilter = query.status ? { veterinarianReviewStatus: query.status } : {};
+  const modalityFilter = query.modality ? { modality: query.modality } : {};
+  const severityFilter = query.severity ? { severity: query.severity } : {};
+
+  const petFilter: Record<string, unknown> = {};
+  if (query.petId) {
+    await assertPetAccess(actor, query.petId, "read");
+    petFilter.petId = query.petId;
+  } else if (actor.accountType === "patient") {
+    const owner = await ownPetOwner(actor);
+    const pets = await PetModel.find({ ownerId: documentId(owner) }).select("_id");
+    petFilter.petId = pets.length ? { $in: pets.map((pet) => pet._id) } : { $in: [] };
+  } else if (actor.accountType === "doctor" && !isAdmin(actor)) {
+    const petIds = await scopedPetIds(actor);
+    petFilter.petId = petIds && petIds.length ? { $in: petIds } : { $in: [] };
+  }
+
+  return paginate(
+    AIReportModel,
+    mergeFilters(petFilter, statusFilter, modalityFilter, severityFilter, search),
+    query,
+    ["createdAt", "generatedAt", "severity", "veterinarianReviewStatus"],
+    "-generatedAt",
+    { path: "petId", select: "name species breed age gender ownerId" }
+  );
+};
+
+/**
+ * Stage 4 — unified clinical review workspace for ONE report: pet info +
+ * symptom evidence + image evidence + combined AI assessment + previous AI
+ * reports + the immutable veterinary review record.
+ */
+export const getVeterinarianReviewDetail = async (
+  actor: VeterinaryActor,
+  reportId: string
+): Promise<Record<string, unknown>> => {
+  requireAnyPermission(actor, ["reports:read", "appointments:read"]);
+  const report = await AIReportModel.findById(reportId).populate({
+    path: "petId",
+    select: "name species breed gender age weight allergies medicalHistory profileImage"
+  });
+  if (!report) throw new AppError("AI report not found", 404);
+  await assertPetAccess(actor, String(report.petId?._id ?? report.petId), "read");
+
+  const pet = report.petId as unknown;
+
+  const previousReports = await AIReportModel.find({
+    petId: report.petId,
+    _id: { $ne: report._id }
+  })
+    .sort({ generatedAt: -1 })
+    .limit(20)
+    .select("prediction.predictedCondition modality generatedAt veterinarianReviewStatus");
+
+  const combinedInputs = (report.combinedAssessment?.inputs as Record<string, unknown>) ?? {};
+  const hasImageEvidence = Boolean(
+    (Array.isArray(report.uploadedImages) && report.uploadedImages.length > 0) ||
+      report.modality === "image" ||
+      combinedInputs.image
+  );
+
+  return {
+    report,
+    pet,
+    previousReports,
+    hasImageEvidence,
+    safetyWarning:
+      "This AI Report is a Preliminary Assessment and must not be considered a diagnosis."
+  };
+};
+
+/**
+ * Stage 4 — prescription foundation. Only an authenticated veterinarian
+ * (doctor profile) or a hospital admin may create a prescription, and only
+ * after the report reached an approved/modified/reviewed state. The AI model
+ * never generates prescriptions.
+ */
+export const createVeterinaryPrescription = async (
+  actor: VeterinaryActor,
+  reportId: string,
+  payload: PrescriptionPayload
+) => {
+  requireAnyPermission(actor, ["appointments:update"]);
+  // Only an authenticated veterinarian (doctor profile) may issue a
+  // prescription — the AI model never generates one.
+  if (actor.accountType !== "doctor") {
+    throw new AppError("Only a veterinarian can create a prescription", 403);
+  }
+  const veterinarian = await ownVeterinarian(actor);
+
+  const report = await AIReportModel.findById(reportId);
+  if (!report) throw new AppError("AI report not found", 404);
+  await assertPetAccess(actor, String(report.petId), "read");
+
+  if (!["approved", "modified", "reviewed"].includes(report.veterinarianReviewStatus ?? "")) {
+    throw new AppError(
+      "A prescription can only be issued for a veterinarian-approved or modified AI report",
+      409
+    );
+  }
+
+  const prescription = await new VeterinaryPrescriptionModel({
+    petId: report.petId,
+    aiReportId: reportId,
+    veterinarianId: documentId(veterinarian),
+    issuedByAccountId: actor.accountId,
+    issuedByAccountType: actor.accountType,
+    medicineName: payload.medicineName,
+    dosage: payload.dosage,
+    frequency: payload.frequency,
+    duration: payload.duration,
+    route: payload.route ?? "",
+    additionalInstructions: payload.additionalInstructions ?? "",
+    reviewDecision: report.veterinarianReview?.decision === "modify" ? "modify" : "approve",
+    issuedAt: new Date(),
+    status: "active"
+  }).save();
+
+  await writeAuditLog({
+    eventType: "prescription.created" as AuditEventType,
+    actor: { accountId: actor.accountId, accountType: actor.accountType, role: actor.role },
+    target: { type: "ai_report", id: reportId },
+    metadata: {
+      prescriptionId: String(prescription._id),
+      petId: String(report.petId),
+      medicineName: payload.medicineName,
+      reportStatus: report.veterinarianReviewStatus
+    }
+  }).catch(() => undefined);
+
+  return prescription;
+};
+
+export const listVeterinaryPrescriptions = async (
+  actor: VeterinaryActor,
+  query: ListingQuery & { petId?: string; aiReportId?: string }
+): Promise<PaginatedResult<unknown>> => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  const filter: Record<string, unknown> = {};
+  if (query.petId) {
+    await assertPetAccess(actor, query.petId, "read");
+    filter.petId = query.petId;
+  }
+  if (query.aiReportId) {
+    const report = await AIReportModel.findById(query.aiReportId);
+    if (!report) throw new AppError("AI report not found", 404);
+    await assertPetAccess(actor, String(report.petId), "read");
+    filter.aiReportId = query.aiReportId;
+  }
+  if (!isAdmin(actor) && actor.accountType === "doctor") {
+    const veterinarian = await ownVeterinarian(actor);
+    filter.veterinarianId = documentId(veterinarian);
+  }
+  if (!isAdmin(actor) && actor.accountType === "patient" && !filter.petId && !filter.aiReportId) {
+    // Data isolation: without an explicit (ownership-checked) pet filter, a
+    // patient may only ever list prescriptions for their own pets.
+    const owner = await ownPetOwner(actor);
+    const pets = await PetModel.find({ ownerId: documentId(owner) }).select("_id");
+    filter.petId = pets.length ? { $in: pets.map((pet) => pet._id) } : { $in: [] };
+  }
+  return paginate(
+    VeterinaryPrescriptionModel,
+    filter,
+    query,
+    ["createdAt", "issuedAt"],
+    "-issuedAt"
+  );
+};
+
+export const getVeterinaryPrescriptionById = async (actor: VeterinaryActor, prescriptionId: string) => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  const prescription = await VeterinaryPrescriptionModel.findById(prescriptionId);
+  if (!prescription) throw new AppError("Prescription not found", 404);
+  await assertPetAccess(actor, String(prescription.petId), "read");
+  if (actor.accountType === "doctor" && !isAdmin(actor)) {
+    const veterinarian = await ownVeterinarian(actor);
+    if (String(prescription.veterinarianId) !== documentId(veterinarian)) {
+      throw new AppError("Prescription not found", 404);
+    }
+  }
+  return prescription;
+};
+
+/**
+ * Stage 4 — online consultation foundation. Owners request a consultation;
+ * veterinarians/admin explicitly and audibly transition the status.
+ */
+export const createConsultationRequest = async (
+  actor: VeterinaryActor,
+  payload: ConsultationRequestPayload
+) => {
+  requireAnyPermission(actor, ["users:manage", "appointments:create"]);
+
+  await assertPetAccess(actor, payload.petId, actor.accountType === "patient" ? "read" : "manage");
+  const requestedVeterinarian = await VeterinarianModel.findById(payload.veterinarianId);
+  if (!requestedVeterinarian) throw new AppError("Veterinarian not found", 404);
+
+  const requesterUserId =
+    actor.accountType === "patient" ? await ownPatientUserId(actor) : undefined;
+  const owner = await PetModel.findById(payload.petId).select("ownerId");
+  const ownerProfile = owner
+    ? await PetOwnerModel.findById(String(owner.ownerId)).select("userId")
+    : null;
+  const ownerUserId = requesterUserId ?? (ownerProfile?.userId ? String(ownerProfile.userId) : undefined);
+
+  if (!ownerUserId) {
+    throw new AppError("Unable to resolve the requesting pet owner account", 403);
+  }
+
+  const request = await new ConsultationRequestModel({
+    petId: payload.petId,
+    requesterUserId: ownerUserId,
+    veterinarianId: payload.veterinarianId,
+    reason: payload.reason,
+    preferredDates: payload.preferredDates ?? [],
+    status: "requested",
+    requestedAt: new Date()
+  }).save();
+
+  await writeAuditLog({
+    eventType: "consultation.requested" as AuditEventType,
+    actor: { accountId: actor.accountId, accountType: actor.accountType, role: actor.role },
+    target: { type: "consultation", id: String(request._id) },
+    metadata: { petId: payload.petId, veterinarianId: payload.veterinarianId }
+  }).catch(() => undefined);
+
+  return request;
+};
+
+export const listConsultationRequests = async (
+  actor: VeterinaryActor,
+  query: ListingQuery & { status?: string }
+): Promise<PaginatedResult<unknown>> => {
+  requireAnyPermission(actor, ["appointments:read"]);
+  const filter: Record<string, unknown> = {};
+  if (query.status) filter.status = query.status;
+
+  if (isAdmin(actor)) {
+    // Administrators review all consultation requests.
+  } else if (actor.accountType === "doctor") {
+    const veterinarian = await ownVeterinarian(actor);
+    filter.veterinarianId = documentId(veterinarian);
+  } else if (actor.accountType === "patient") {
+    filter.requesterUserId = actor.accountId;
+  } else {
+    throw new AppError("Forbidden", 403);
+  }
+
+  return paginate(
+    ConsultationRequestModel,
+    filter,
+    query,
+    ["createdAt", "requestedAt", "status"],
+    "-requestedAt"
+  );
+};
+
+export const updateConsultationRequestStatus = async (
+  actor: VeterinaryActor,
+  consultationId: string,
+  payload: ConsultationUpdatePayload
+) => {
+  requireAnyPermission(actor, ["appointments:update"]);
+  const consultation = await ConsultationRequestModel.findById(consultationId);
+  if (!consultation) throw new AppError("Consultation request not found", 404);
+
+  if (!isAdmin(actor)) {
+    if (actor.accountType === "patient") {
+      throw new AppError("Only a veterinarian can update consultation status", 403);
+    }
+    const veterinarian = await ownVeterinarian(actor);
+    if (String(consultation.veterinarianId) !== documentId(veterinarian)) {
+      throw new AppError("Consultation request not found", 404);
+    }
+  }
+
+  const update: Record<string, unknown> = {
+    status: payload.status,
+    decidedByAccountId: actor.accountId,
+    decidedAt: new Date()
+  };
+  if (payload.notes !== undefined) update.notes = payload.notes;
+
+  const updated = await ConsultationRequestModel.findByIdAndUpdate(consultationId, update, {
+    new: true,
+    runValidators: true
+  });
+  if (!updated) throw new AppError("Consultation request not found", 404);
+
+  await writeAuditLog({
+    eventType: "consultation.status_changed" as AuditEventType,
+    actor: { accountId: actor.accountId, accountType: actor.accountType, role: actor.role },
+    target: { type: "consultation", id: consultationId },
+    metadata: { previousStatus: consultation.status, status: payload.status }
+  }).catch(() => undefined);
+
+  return updated;
+};
+
+/** Great-circle distance in km between two lat/lng pairs (haversine). */
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const toRad = (value: number): number => (value * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+/**
+ * Stage 4 — nearby veterinarian discovery service boundary.
+ *
+ * Returns REAL veterinarian records (never hard-coded clinics). When client
+ * coordinates (obtained via the owner's location permission) are supplied and
+ * a veterinarian has recorded a location, results are ordered nearest-first
+ * with a computed `distanceKm`. Records without coordinates stay visible so no
+ * veterinarian is hidden by missing location data.
+ */
+export const nearbyVeterinarians = async (
+  actor: VeterinaryActor,
+  query: NearbyVeterinarianQuery = {}
+): Promise<unknown[]> => {
+  requireAnyPermission(actor, ["doctors:read", "appointments:read"]);
+
+  const filter: Record<string, unknown> = {};
+  const hasCoordinates =
+    typeof query.lat === "number" &&
+    typeof query.lng === "number" &&
+    Number.isFinite(query.lat) &&
+    Number.isFinite(query.lng);
+
+  const search = textSearch(query.search ?? "", ["clinicName", "specialization"]);
+  if (query.specialization) {
+    filter.specialization = new RegExp(`^${escapeRegex(query.specialization)}$`, "i");
+  }
+  if (search && Array.isArray(search.$or)) {
+    filter.$or = search.$or;
+  }
+
+  const limit = query.limit ?? 20;
+  const veterinarians = await VeterinarianModel.find(filter)
+    .limit(limit)
+    .select(
+      "doctorId specialization clinicName yearsOfExperience consultationFee consultationAvailable availability location"
+    );
+
+  const items = veterinarians.map((veterinarian) => {
+    const vet = veterinarian as unknown as {
+      _id: unknown;
+      specialization?: string[];
+      clinicName?: string;
+      yearsOfExperience?: number;
+      consultationFee?: number;
+      consultationAvailable?: boolean;
+      availability?: { enabled?: boolean };
+      location?: { lat?: number; lng?: number; address?: string };
+    };
+    const location = vet.location ?? {};
+    const distanceKm =
+      hasCoordinates && typeof location.lat === "number" && typeof location.lng === "number"
+        ? Math.round(
+            haversineKm(query.lat as number, query.lng as number, location.lat, location.lng) * 100
+          ) / 100
+        : undefined;
+
+    return {
+      veterinarianId: String(vet._id),
+      clinicName: vet.clinicName ?? "",
+      specialization: vet.specialization ?? [],
+      yearsOfExperience: vet.yearsOfExperience ?? 0,
+      consultationFee: vet.consultationFee ?? 0,
+      consultationAvailable: vet.consultationAvailable ?? false,
+      available: vet.availability?.enabled ?? true,
+      address: location.address ?? undefined,
+      location:
+        typeof location.lat === "number" && typeof location.lng === "number"
+          ? { lat: location.lat, lng: location.lng }
+          : {},
+      distanceKm
+    };
+  });
+
+  if (hasCoordinates) {
+    items.sort((a, b) => {
+      const da = (a as { distanceKm?: number }).distanceKm;
+      const db = (b as { distanceKm?: number }).distanceKm;
+      if (da === undefined && db === undefined) return 0;
+      if (da === undefined) return 1;
+      if (db === undefined) return -1;
+      return da - db;
+    });
+  }
+
+  return items;
 };

@@ -10,6 +10,23 @@ export interface Veterinarian {
   licenseNumber: string;
   consultationFee: number;
   availability: DoctorAvailability;
+  /**
+   * Stage 4 foundation — online consultation availability flag.
+   * No fake data is hard-coded; it reflects veterinarian-set preferences only.
+   */
+  consultationAvailable?: boolean;
+  /**
+   * Stage 4 foundation — physical location used by the nearby-veterinarian
+   * discovery boundary. Optional: when present it enables distance-based
+   * ordering; when absent the service still returns real veterinarian
+   * records (sorted by distance only when coordinates exist).
+   */
+  location?: {
+    lat?: number;
+    lng?: number;
+    /** Human-readable clinic address shown in discovery results. */
+    address?: string;
+  };
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -55,6 +72,18 @@ const veterinarianSchema = new mongoose.Schema<Veterinarian>(
       index: true
     },
     consultationFee: { type: Number, required: true, min: 0 },
+    consultationAvailable: { type: Boolean, default: false },
+    location: {
+      type: new mongoose.Schema(
+        {
+          lat: { type: Number },
+          lng: { type: Number },
+          address: { type: String, trim: true, maxlength: 500 }
+        },
+        { _id: false }
+      ),
+      default: undefined
+    },
     availability: { type: availabilitySchema, default: () => ({}) }
   },
   { timestamps: true }

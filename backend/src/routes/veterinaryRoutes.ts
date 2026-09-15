@@ -5,15 +5,20 @@ import {
   createPetOwnerProfile,
   createPetProfile,
   createPreliminaryAiReport,
+  createPrescription,
   createVaccination,
   createVeterinarianProfile,
+  consultationRequestsList,
   deleteMedicalRecord,
   deletePetOwner,
   deletePetProfile,
+  deletePetPhoto,
   deletePreliminaryAiReport,
   deleteVaccinationRecord,
   deleteVeterinarianProfile,
   medicalRecordById,
+  nearbyVeterinarianList,
+  newConsultationRequest,
   overdueVaccinations,
   petById,
   petMedicalHistory,
@@ -22,13 +27,17 @@ import {
   petVaccinations,
   preliminaryAiReportById,
   preliminaryAiReports,
+  prescriptionById,
+  prescriptionsList,
   searchPetOwnerProfiles,
   searchPets,
   searchVeterinarians,
   upcomingVaccinations,
+  updateConsultationStatus,
   updateMedicalRecord,
   updatePetOwner,
   updatePetProfile,
+  updatePetPhoto,
   updatePreliminaryAiReportReview,
   updateVaccinationRecord,
   updateVeterinarianProfile,
@@ -36,16 +45,24 @@ import {
   vaccinationStats,
   veterinaryDashboardStats,
   veterinaryDashboardSummary,
+  veterinaryReviewDetail,
+  veterinaryReviewQueue,
   veterinarianById,
   veterinarians
 } from "../controllers/veterinaryController.js";
 import { authAny, authorizePermissions } from "../middleware/auth.js";
+import upload from "../middleware/upload.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import {
   aiReportCreateSchema,
   aiReportIdParamSchema,
   aiReportQuerySchema,
   aiReportReviewUpdateSchema,
+  consultationIdParamSchema,
+  consultationRequestCreateSchema,
+  consultationRequestQuerySchema,
+  consultationRequestUpdateSchema,
+  nearbyVeterinarianQuerySchema,
   ownerIdQuerySchema,
   petCreateSchema,
   petIdParamSchema,
@@ -57,6 +74,10 @@ import {
   petOwnerCreateSchema,
   petOwnerUpdateSchema,
   petUpdateSchema,
+  prescriptionCreateSchema,
+  prescriptionIdParamSchema,
+  prescriptionQuerySchema,
+  reviewQueueQuerySchema,
   vaccinationCreateSchema,
   vaccinationIdParamSchema,
   vaccinationQuerySchema,
@@ -148,6 +169,24 @@ veterinaryRouter.delete(
   authorizePermissions("users:manage"),
   validateRequest({ params: petIdParamSchema }),
   deletePetProfile
+);
+
+// Pet photo upload/removal (multipart/form-data; field name: "image").
+// Reuses the shared image upload middleware and Cloudinary/dev-fallback pipeline.
+veterinaryRouter.post(
+  "/pets/:petId/photo",
+  authAny,
+  authorizePermissions("users:manage"),
+  validateRequest({ params: petIdParamSchema }),
+  upload.single("image"),
+  updatePetPhoto
+);
+veterinaryRouter.delete(
+  "/pets/:petId/photo",
+  authAny,
+  authorizePermissions("users:manage"),
+  validateRequest({ params: petIdParamSchema }),
+  deletePetPhoto
 );
 
 veterinaryRouter.post(
@@ -301,6 +340,77 @@ veterinaryRouter.delete(
   authorizePermissions("users:manage"),
   validateRequest({ params: aiReportIdParamSchema }),
   deletePreliminaryAiReport
+);
+
+// ======== Stage 4 — Veterinarian Review & Clinical Decision Workflow ========
+
+// Veterinarian review queue (combined AI reports primary).
+veterinaryRouter.get(
+  "/review-queue",
+  authAny,
+  authorizePermissions("reports:read"),
+  validateRequest({ query: reviewQueueQuerySchema }),
+  veterinaryReviewQueue
+);
+
+// Unified clinical review workspace for one report.
+veterinaryRouter.get(
+  "/ai-reports/:reportId/review-detail",
+  authAny,
+  authorizePermissions("reports:read"),
+  validateRequest({ params: aiReportIdParamSchema }),
+  veterinaryReviewDetail
+);
+
+// Prescriptions (only after veterinarian approval/modification).
+veterinaryRouter.post(
+  "/ai-reports/:reportId/prescriptions",
+  authAny,
+  authorizePermissions("appointments:update"),
+  validateRequest({ params: aiReportIdParamSchema, body: prescriptionCreateSchema }),
+  createPrescription
+);
+veterinaryRouter.get(
+  "/prescriptions",
+  authAny,
+  validateRequest({ query: prescriptionQuerySchema }),
+  prescriptionsList
+);
+veterinaryRouter.get(
+  "/prescriptions/:prescriptionId",
+  authAny,
+  validateRequest({ params: prescriptionIdParamSchema }),
+  prescriptionById
+);
+
+// Online consultation request foundation.
+veterinaryRouter.post(
+  "/consultation-requests",
+  authAny,
+  validateRequest({ body: consultationRequestCreateSchema }),
+  newConsultationRequest
+);
+veterinaryRouter.get(
+  "/consultation-requests",
+  authAny,
+  validateRequest({ query: consultationRequestQuerySchema }),
+  consultationRequestsList
+);
+veterinaryRouter.patch(
+  "/consultation-requests/:consultationId/status",
+  authAny,
+  authorizePermissions("appointments:update"),
+  validateRequest({ params: consultationIdParamSchema, body: consultationRequestUpdateSchema }),
+  updateConsultationStatus
+);
+
+// Nearby veterinarian discovery boundary (location permission on the client).
+veterinaryRouter.get(
+  "/veterinarians/nearby",
+  authAny,
+  authorizePermissions("doctors:read"),
+  validateRequest({ query: nearbyVeterinarianQuerySchema }),
+  nearbyVeterinarianList
 );
 
 export default veterinaryRouter;

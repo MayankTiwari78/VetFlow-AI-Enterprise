@@ -1,4 +1,4 @@
-﻿import type { Request } from "express";
+import type { Request } from "express";
 import type { RequestHandler } from "express";
 
 import AIReportModel from "../models/AIReport.js";
@@ -94,7 +94,10 @@ async function resolveImageEvidence(petId: string, reportId?: string): Promise<I
   if (!report || String(report.petId) !== petId || report.modality !== "image") {
     throw new AppError("A valid saved image report for this pet is required", 400);
   }
-  return toImageEvidence((report.imageAssessment as Record<string, unknown>) ?? {});
+  const evidence = toImageEvidence((report.imageAssessment as Record<string, unknown>) ?? {});
+  // Traceability: the combined report records exactly which saved image
+  // assessment contributed its evidence.
+  return { ...evidence, imageReportId: String(report._id) };
 }
 
 function severityFromBand(band: EvidenceBand): "low" | "moderate" | "high" {
@@ -151,12 +154,14 @@ export function buildCombinedAssessment(
  */
 export function buildCombinedReportDocument(
   petId: string,
-  assessment: Record<string, unknown>
+  assessment: Record<string, unknown>,
+  symptomsUsed: string[] = []
 ): Record<string, unknown> {
   const result = assessment.combinedAssessment as CombinedAssessmentResult;
   return {
     petId,
-    symptoms: [],
+    // Symptom keys that actually fed this combined assessment (traceability).
+    symptoms: symptomsUsed,
     uploadedImages: [],
     aiSummary: String(assessment.narrative ?? ""),
     possibleConditions: result.topConditions.map((row) => row.condition),
@@ -193,6 +198,8 @@ export interface CombinedContext {
   actor: VeterinaryActor;
   petId: string;
   assessment: Record<string, unknown>;
+  /** Symptom keys actually used as evidence (empty for image-only runs). */
+  symptomsUsed: string[];
 }
 
 export async function evaluateCombined(req: Request): Promise<CombinedContext> {
@@ -222,7 +229,12 @@ export async function evaluateCombined(req: Request): Promise<CombinedContext> {
   }
 
   const assessment = buildCombinedAssessment(symptom, image, history);
-  return { actor, petId, assessment };
+  const symptomsUsed = body.symptoms
+    ? Object.entries(body.symptoms)
+        .filter(([, value]) => Number(value) > 0)
+        .map(([key]) => key)
+    : [];
+  return { actor, petId, assessment, symptomsUsed };
 }
 
 export const combinedAssessmentPredict: RequestHandler = asyncHandler(async (req, res) => {
@@ -234,7 +246,11 @@ export const combinedAssessmentSave: RequestHandler = asyncHandler(async (req, r
   const ctx = await evaluateCombined(req);
   const report = await createAiReport(
     ctx.actor,
-    buildCombinedReportDocument(ctx.petId, ctx.assessment) as Parameters<typeof createAiReport>[1]
+    buildCombinedReportDocument(
+      ctx.petId,
+      ctx.assessment,
+      ctx.symptomsUsed
+    ) as Parameters<typeof createAiReport>[1]
   );
   sendSuccess(res, 201, "Combined preliminary AI assessment saved to history", {
     report: report.toObject ? report.toObject() : report

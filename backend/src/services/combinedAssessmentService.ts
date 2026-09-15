@@ -34,6 +34,8 @@ export interface SymptomEvidence {
 }
 
 export interface ImageEvidence {
+  /** Saved AIReport id this image evidence was sourced from (traceability). */
+  imageReportId?: string;
   predictedClass: string;
   band: EvidenceBand;
   probability: number;

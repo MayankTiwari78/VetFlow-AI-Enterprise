@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
+import { formatDateTime, downloadTextFile, imageEvidenceText } from './reportUtils'
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024
 const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -40,6 +41,7 @@ const AiImageAssessment = ({ backendUrl, token, pet, onReportSaved }) => {
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState(null)
   const [savedReportId, setSavedReportId] = useState(null)
+  const [savedReportAt, setSavedReportAt] = useState('')
   const [error, setError] = useState('')
   const inputRef = useRef(null)
 
@@ -152,6 +154,7 @@ const AiImageAssessment = ({ backendUrl, token, pet, onReportSaved }) => {
         throw new Error('Unexpected response while saving the AI image report')
       }
       setSavedReportId(String(report._id))
+      setSavedReportAt(report.createdAt || report.generatedAt || report.created_at || '')
       toast.success('Preliminary AI image assessment saved to history')
       onReportSaved?.()
     } catch (e) {
@@ -163,6 +166,21 @@ const AiImageAssessment = ({ backendUrl, token, pet, onReportSaved }) => {
     } finally { setSaving(false) }
   }
 
+  const downloadEvidence = () => {
+    if (!result) return
+    const stamp = savedReportAt || result.generatedAt || result.createdAt || ''
+    const text = [
+      'MEDFLOW AI',
+      'AI Image Assessment \u2014 Supporting Evidence',
+      `Generated: ${formatDateTime(stamp) || 'unknown time'}`,
+      '--------------------------------------------',
+      '',
+      imageEvidenceText({ imageFindings: result.imageFindings, imageConfidence: result.imageConfidence, prediction: null, timestamp: stamp, reportId: savedReportId }),
+      '',
+      'This is supporting AI evidence \u2014 not a diagnosis. Veterinarian review is required.'
+    ].join('\n')
+    downloadTextFile(`ai-image-evidence-${(savedReportId || 'preview').slice(-8)}.txt`, text)
+  }
   const findings = result?.imageFindings
   const confidence = result?.imageConfidence
   const bandColor =
@@ -286,6 +304,7 @@ const AiImageAssessment = ({ backendUrl, token, pet, onReportSaved }) => {
                 </ul>
               </details>
               {result.disclaimer && <p className='mt-3 text-xs italic text-slate-500'>{result.disclaimer}</p>}
+              <button className='mf-button-secondary mt-3' type='button' onClick={downloadEvidence}>Download image evidence</button>
             </div>
           )}
 
@@ -293,7 +312,7 @@ const AiImageAssessment = ({ backendUrl, token, pet, onReportSaved }) => {
             <div role='status' className='mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'>
               <p className='font-semibold'>✓ Saved to AI Health Reports history.</p>
               <p className='mt-1 text-xs font-normal'>
-                Report ID: {savedReportId}. It appears in the AI Health Reports history below,
+                Saved: {formatDateTime(savedReportAt) || 'unknown time'}. Report ID: {savedReportId}. It appears in the AI Health Reports history below,
                 is visible after reload, and awaits veterinarian review (status: pending).
               </p>
             </div>

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { toast } from 'react-toastify'
 
 import { isAuthSessionHandledError } from '../../api/authClient'
+import { pretty, safeStamp, downloadTextFile, symptomEvidenceText } from './reportUtils'
 
 const SYMPTOMS = ['Fever', 'Cough', 'Diarrhea', 'Lethargy', 'Loss_of_Appetite']
 const empty = () => ({ Fever: 0, Cough: 0, Diarrhea: 0, Lethargy: 0, Loss_of_Appetite: 0 })
@@ -29,9 +30,27 @@ const AiSymptomForm = ({ backendUrl, token, petId, onReportSaved }) => {
     } finally { setLoading(false) }
   }
 
+  const downloadEvidence = () => {
+    if (!prediction) return
+    const stamp = prediction.generatedAt || prediction.createdAt || ''
+    const text = [
+      'MEDFLOW AI',
+      'Symptom Assessment \u2014 Supporting Evidence',
+      `Generated: ${safeStamp(stamp, 'preview (not persisted)')}`,
+      '--------------------------------------------',
+      '',
+      symptomEvidenceText({ symptoms, prediction, timestamp: stamp }),
+      '',
+      'This is supporting AI evidence \u2014 not a diagnosis. Veterinarian review is required.'
+    ].join('\n')
+    downloadTextFile('ai-symptom-evidence.txt', text)
+  }
   return (
     <div className='mf-card p-5'>
-      <h3 className='text-lg font-semibold text-ink'>AI Preliminary Assessment</h3>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
+        <h3 className='text-lg font-semibold text-ink'>Symptom Assessment</h3>
+        <span className='rounded-md bg-violet/10 px-2 py-1 text-xs font-bold uppercase tracking-wide text-violet'>Step 3 evidence</span>
+      </div>
       <p className='mt-1 text-sm text-slate-600'>Enter symptom severity (0 = none, 3 = severe). This is a preliminary AI assessment, not a diagnosis.</p>
       {error && <div role='alert' className='mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{error}</div>}
       <div className='mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5'>
@@ -47,6 +66,7 @@ const AiSymptomForm = ({ backendUrl, token, petId, onReportSaved }) => {
       <div className='mt-4 flex flex-wrap gap-3'>
         <button className='mf-button' disabled={loading} type='button' onClick={() => run(false)}>{loading ? 'Running...' : 'Run AI Assessment'}</button>
         <button className='mf-button-secondary' disabled={loading} type='button' onClick={() => run(true)}>{loading ? 'Saving...' : 'Run & Save Report'}</button>
+        {prediction && <button className='mf-button-secondary' type='button' onClick={downloadEvidence}>Download symptom evidence</button>}
       </div>
       {prediction && (
         <div className='mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4'>

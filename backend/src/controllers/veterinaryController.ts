@@ -4,12 +4,15 @@ import type { RequestHandler } from "express";
 import {
   addVaccination,
   createAiReport,
+  createConsultationRequest,
   createPet,
   createPetMedicalRecord,
   createPetOwner,
   createVeterinarian,
+  createVeterinaryPrescription,
   deleteAiReport,
   deletePet,
+  deletePetPhoto as deletePetPhotoService,
   deletePetMedicalRecord,
   deletePetOwnerProfile,
   deleteVaccination,
@@ -23,17 +26,25 @@ import {
   getUpcomingVaccinations,
   getVaccinationById,
   getVaccinationStats,
+  getVeterinarianById,
+  getVeterinarianReviewDetail,
   getVeterinaryDashboardStats,
   getVeterinaryDashboardSummary,
-  getVeterinarianById,
+  getVeterinaryPrescriptionById,
   listAiReports,
+  listConsultationRequests,
   listPets,
   listVaccinationsByPet,
   listVeterinarians,
+  listVeterinarianReviewQueue,
+  listVeterinaryPrescriptions,
+  nearbyVeterinarians,
   searchPetOwners,
   updateAiReportReviewStatus,
+  updateConsultationRequestStatus,
   updatePet,
   updatePetMedicalRecord,
+  updatePetPhoto as updatePetPhotoService,
   updatePetOwnerProfile,
   updateVaccination,
   updateVeterinarian,
@@ -153,6 +164,30 @@ export const updatePetProfile: RequestHandler = asyncHandler(async (req, res) =>
 export const deletePetProfile: RequestHandler = asyncHandler(async (req, res) => {
   await deletePet(veterinaryActorFromRequest(req), req.params.petId as string);
   sendSuccess(res, 200, "Pet deleted");
+});
+
+export const updatePetPhoto: RequestHandler = asyncHandler(async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    throw new AppError(
+      "A photo file is required for this action (field name: 'image')",
+      400
+    );
+  }
+  const pet = await updatePetPhotoService(
+    veterinaryActorFromRequest(req),
+    req.params.petId as string,
+    file
+  );
+  sendSuccess(res, 200, "Pet photo updated", { pet });
+});
+
+export const deletePetPhoto: RequestHandler = asyncHandler(async (req, res) => {
+  const pet = await deletePetPhotoService(
+    veterinaryActorFromRequest(req),
+    req.params.petId as string
+  );
+  sendSuccess(res, 200, "Pet photo removed", { pet });
 });
 
 export const createVeterinarianProfile: RequestHandler = asyncHandler(async (req, res) => {
@@ -344,4 +379,88 @@ export const updatePreliminaryAiReportReview: RequestHandler = asyncHandler(asyn
     req.body as Parameters<typeof updateAiReportReviewStatus>[2]
   );
   sendSuccess(res, 200, "Preliminary assessment report review status updated", { report });
+});
+
+// ======== Stage 4 — Veterinarian Review & Clinical Decision Workflow ========
+
+export const veterinaryReviewQueue: RequestHandler = asyncHandler(async (req, res) => {
+  const reports = await listVeterinarianReviewQueue(
+    veterinaryActorFromRequest(req),
+    req.query as Parameters<typeof listVeterinarianReviewQueue>[1]
+  );
+  sendSuccess(res, 200, "Veterinarian review queue loaded", {
+    reports: reports.items,
+    pagination: reports.pagination,
+    safetyWarning:
+      "This AI Report is a Preliminary Assessment and must not be considered a diagnosis."
+  });
+});
+
+export const veterinaryReviewDetail: RequestHandler = asyncHandler(async (req, res) => {
+  const workspace = await getVeterinarianReviewDetail(
+    veterinaryActorFromRequest(req),
+    req.params.reportId as string
+  );
+  sendSuccess(res, 200, "Veterinarian review workspace loaded", workspace);
+});
+
+export const createPrescription: RequestHandler = asyncHandler(async (req, res) => {
+  const prescription = await createVeterinaryPrescription(
+    veterinaryActorFromRequest(req),
+    req.params.reportId as string,
+    req.body as Parameters<typeof createVeterinaryPrescription>[2]
+  );
+  sendSuccess(res, 201, "Veterinarian prescription created", { prescription });
+});
+
+export const prescriptionsList: RequestHandler = asyncHandler(async (req, res) => {
+  const prescriptions = await listVeterinaryPrescriptions(
+    veterinaryActorFromRequest(req),
+    req.query as Parameters<typeof listVeterinaryPrescriptions>[1]
+  );
+  sendSuccess(res, 200, "Prescriptions loaded", listPayload("prescriptions", prescriptions));
+});
+
+export const prescriptionById: RequestHandler = asyncHandler(async (req, res) => {
+  const prescription = await getVeterinaryPrescriptionById(
+    veterinaryActorFromRequest(req),
+    req.params.prescriptionId as string
+  );
+  sendSuccess(res, 200, "Prescription loaded", { prescription });
+});
+
+export const newConsultationRequest: RequestHandler = asyncHandler(async (req, res) => {
+  const consultation = await createConsultationRequest(
+    veterinaryActorFromRequest(req),
+    req.body as Parameters<typeof createConsultationRequest>[1]
+  );
+  sendSuccess(res, 201, "Consultation request created", { consultation });
+});
+
+export const consultationRequestsList: RequestHandler = asyncHandler(async (req, res) => {
+  const requests = await listConsultationRequests(
+    veterinaryActorFromRequest(req),
+    req.query as Parameters<typeof listConsultationRequests>[1]
+  );
+  sendSuccess(res, 200, "Consultation requests loaded", {
+    consultations: requests.items,
+    pagination: requests.pagination
+  });
+});
+
+export const updateConsultationStatus: RequestHandler = asyncHandler(async (req, res) => {
+  const consultation = await updateConsultationRequestStatus(
+    veterinaryActorFromRequest(req),
+    req.params.consultationId as string,
+    req.body as Parameters<typeof updateConsultationRequestStatus>[2]
+  );
+  sendSuccess(res, 200, "Consultation request status updated", { consultation });
+});
+
+export const nearbyVeterinarianList: RequestHandler = asyncHandler(async (req, res) => {
+  const veterinarians = await nearbyVeterinarians(
+    veterinaryActorFromRequest(req),
+    req.query as Parameters<typeof nearbyVeterinarians>[1]
+  );
+  sendSuccess(res, 200, "Nearby veterinarians loaded", { veterinarians });
 });
