@@ -1,6 +1,13 @@
 # =============================================================================
-# VetFlow-AI backend — PRODUCTION image (Node API + Python ML/CV inference)
+# VetFlow-AI backend — PRODUCTION image (Node API + optional Python ML/CV)
 # -----------------------------------------------------------------------------
+# BUILD CONTEXT = REPOSITORY ROOT (not backend/).
+#   Render:  Dockerfile Path: backend/Dockerfile.prod   Docker Context: .
+#   Local :  docker build -f backend/Dockerfile.prod .
+#   Because the context is the repo root, EVERY COPY source is prefixed with
+#   "backend/". There is deliberately no root-level package.json: this image
+#   builds only the backend workspace.
+#
 # WHY THIS FILE EXISTS (and why it does NOT replace the dev backend/Dockerfile):
 #   The backend calls Python OUT-OF-PROCESS for inference (unchanged design):
 #     * Stage 1  backend/ml/ai_predict.py        -> scikit-learn LogisticRegression
@@ -16,48 +23,81 @@
 #   Stage-2 weights (reference-ml/stage2_cv, ~70 MB, git-ignored) are NOT baked
 #   in; they are MOUNTED read-only at runtime by docker-compose.prod.yml at
 #   CV_STAGE2_ROOT=/opt/stage2_cv.
+#
+# ML IS OPTIONAL AT BUILD TIME (INSTALL_ML_DEPS):
+#   Default "false" keeps the Render image small and the build fast. The Node
+#   server never imports torch/sklearn at boot, and both bridges degrade
+#   gracefully at REQUEST time when no interpreter is present:
+#     * Stage 1 -> 503 "AI symptom assessment is temporarily unavailable"
+#     * Stage 2 -> 503 "AI image assessment engine is not available on this server"
+#   Build with --build-arg INSTALL_ML_DEPS=true (docker-compose.prod.yml does
+#   this) to bake the pinned venv for full on-platform inference.
+#
+# SECRETS: no .env / env.txt is copied. All configuration is injected by the
+#   platform (Render environment variables / compose env_file).
 # =============================================================================
 
 # ---- build stage: compile TypeScript -> dist/ ------------------------------
+# Context is the repo root, so sources are addressed as backend/*.
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci
-COPY tsconfig.json ./
-COPY src ./src
+COPY backend/tsconfig.json ./
+COPY backend/src ./src
 RUN npm run build
 
-# ---- runtime stage: Node server + Python inference venv --------------------
+# ---- runtime stage: Node server (+ optional Python inference venv) ---------
 FROM node:22-bookworm-slim AS runtime
-ENV NODE_ENV=production
+
+# Build-time switch for the Python inference stack (see header above).
+ARG INSTALL_ML_DEPS=false
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0
+
 WORKDIR /app
 
-# System Python + minimal tooling needed to install wheels.
+# ca-certificates is always needed (Atlas TLS). Python is installed only when
+# the ML stack is requested, so the default image stays lean.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && if [ "$INSTALL_ML_DEPS" = "true" ]; then \
+      apt-get install -y --no-install-recommends python3 python3-venv python3-pip; \
+    fi \
  && rm -rf /var/lib/apt/lists/*
 
 # Isolated ML venv. Debian marks system Python "externally managed" (PEP 668);
-# a venv is the clean, supported way to install our pinned deps.
-COPY ml-requirements.txt ./
-RUN python3 -m venv /opt/ml-venv \
- && /opt/ml-venv/bin/pip install --no-cache-dir --upgrade pip \
- && /opt/ml-venv/bin/pip install --no-cache-dir \
-      --extra-index-url https://download.pytorch.org/whl/cpu \
-      -r ml-requirements.txt
+# a venv is the clean, supported way to install our pinned deps. Skipped unless
+# INSTALL_ML_DEPS=true.
+COPY backend/ml-requirements.txt ./
+RUN if [ "$INSTALL_ML_DEPS" = "true" ]; then \
+      python3 -m venv /opt/ml-venv \
+      && /opt/ml-venv/bin/pip install --no-cache-dir --upgrade pip \
+      && /opt/ml-venv/bin/pip install --no-cache-dir \
+           --extra-index-url https://download.pytorch.org/whl/cpu \
+           -r ml-requirements.txt; \
+    fi
 
 # Production Node dependencies only.
-COPY package.json package-lock.json ./
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Compiled server + Python bridge scripts + committed Stage-1 model.
+# Compiled server + Python bridge scripts + committed Stage-1 model
+# (backend/ml/vetflow_model_v1_1.pkl). Stage-2 weights are NOT baked in: they
+# are mounted read-only at runtime at CV_STAGE2_ROOT by docker-compose.prod.yml.
 COPY --from=build /app/dist ./dist
-COPY ml ./ml
+COPY backend/ml ./ml
 
-# Point BOTH inference bridges at the venv interpreter (it has torch + sklearn).
-# CV_STAGE2_ROOT is provided at runtime (mounted volume), not baked here.
+# Point BOTH inference bridges at the venv interpreter. When the ML stack is not
+# installed these paths do not exist; the bridges then fall back to python3/
+# python on PATH and finally return a clean 503 — never a crash or crash loop.
+# CV_STAGE2_ROOT remains a runtime concern (mounted volume / platform env var).
 ENV STAGE1_PYTHON_PATH=/opt/ml-venv/bin/python \
     CV_PYTHON_PATH=/opt/ml-venv/bin/python
 
+# Default port for local/compose runs. On Render the platform injects PORT and
+# the server binds it (backend/src/server.ts -> app.listen(env.PORT) with no
+# host argument, which listens on all interfaces = 0.0.0.0).
 EXPOSE 4000
 CMD ["node", "--enable-source-maps", "dist/server.js"]

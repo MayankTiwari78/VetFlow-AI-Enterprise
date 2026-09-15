@@ -26,8 +26,15 @@ name: vetflow-prod
 services:
   backend:
     build:
-      context: ../backend
-      dockerfile: Dockerfile.prod
+      # Context is the REPOSITORY ROOT so the SAME Dockerfile path works here and
+      # on Render (Dockerfile Path: backend/Dockerfile.prod, Context: .).
+      context: ..
+      dockerfile: backend/Dockerfile.prod
+      args:
+        # Bake the pinned Python venv for on-platform Stage-1/Stage-2 inference.
+        # Set to "false" for a smaller/faster image (AI endpoints then reply 503
+        # instead of running the models — the rest of the API is unaffected).
+        INSTALL_ML_DEPS: "true"
     env_file:
       - ./env/backend.env.prod
     environment:
