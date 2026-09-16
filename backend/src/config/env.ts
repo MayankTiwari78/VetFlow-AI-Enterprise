@@ -26,6 +26,13 @@ const envSchema = z.object({
   JWT_AUDIENCE: z.string().trim().min(1).default("medflow-ai-clients"),
   CLIENT_URL: z.string().trim().url().default("http://localhost:3000"),
   ADMIN_URL: z.string().trim().url().default("http://localhost:3001"),
+  // Extra browser origins allowed to call the API (comma separated), on top of
+  // CLIENT_URL, ADMIN_URL and the Vercel deployment URLs below.
+  CORS_ALLOWED_ORIGINS: z.string().trim().optional(),
+  // Vercel projects whose production and preview deployment URLs are trusted:
+  // https://<project>.vercel.app and https://<project>-*.vercel.app.
+  // Set to an empty string to trust explicit origins only.
+  CORS_VERCEL_PREVIEW_PROJECTS: z.string().trim().default("vet-flow-ai-enterprise"),
   ADMIN_EMAIL: z
     .string()
     .trim()

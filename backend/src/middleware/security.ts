@@ -3,38 +3,69 @@ import type { RequestHandler } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 
+import {
+  createCorsOriginPolicy,
+  parseOriginList,
+  parseProjectSlugs
+} from "../config/cors.js";
 import { env } from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 import { getCookie, refreshCookieNameForRole } from "../utils/cookies.js";
+import { logger } from "../utils/logger.js";
 
-const developmentOrigins = env.isDevelopment
-  ? [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3001",
-      "http://127.0.0.1:3001",
-      "http://localhost:3010",
-      "http://127.0.0.1:3010",
-      "http://localhost:3011",
-      "http://127.0.0.1:3011"
-    ]
-  : [];
+const { origins: extraOrigins, invalid: invalidExtraOrigins } = parseOriginList(
+  env.CORS_ALLOWED_ORIGINS
+);
 
-// Keep production origin access explicit while supporting both local loopback forms in development.
-const allowedOrigins = new Set([env.CLIENT_URL, env.ADMIN_URL, ...developmentOrigins]);
+if (invalidExtraOrigins.length > 0) {
+  logger.warn(
+    { event: "cors.invalid_origins", invalidOrigins: invalidExtraOrigins },
+    "Ignoring unusable CORS_ALLOWED_ORIGINS entries"
+  );
+}
+
+if (env.isProduction && env.CORS_VERCEL_PREVIEW_PROJECTS.trim().length === 0) {
+  logger.info(
+    { event: "cors.vercel_previews_disabled" },
+    "Vercel preview deployment origins are disabled; only explicit origins are trusted"
+  );
+}
+
+// Production access stays explicit (never a `*` wildcard because the browser
+// apps send the httpOnly refresh cookie), while Vercel production/preview
+// deployment URLs and the local development servers keep working.
+export const corsOriginPolicy = createCorsOriginPolicy({
+  clientUrl: env.CLIENT_URL,
+  adminUrl: env.ADMIN_URL,
+  extraOrigins,
+  vercelPreviewProjects: parseProjectSlugs(env.CORS_VERCEL_PREVIEW_PROJECTS),
+  isDevelopment: env.isDevelopment
+});
+
+export const allowedOrigins = corsOriginPolicy.allowedOrigins;
 
 export const helmetMiddleware = helmet();
 
 export const corsMiddleware = cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
+    // Requests without an Origin header (curl, health checks, server-to-server
+    // calls) are not browser cross-origin requests, so they are left alone.
+    if (!origin || corsOriginPolicy.isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }
 
     callback(new AppError("Origin is not allowed by CORS", 403));
   },
-  credentials: true
+  credentials: true,
+  // OPTIONS preflight is answered by this middleware before the routers run, so
+  // every accepted origin gets an explicit allow-origin/credentials response.
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  optionsSuccessStatus: 204,
+  // `allowedHeaders` is intentionally omitted: the cors middleware then reflects
+  // the requested headers, which keeps the app's custom `token`, `aToken`,
+  // `dToken` and `Authorization` headers working from every accepted origin.
+  maxAge: 600
 });
 
 const disabledRateLimiter: RequestHandler = (_req, _res, next) => next();
@@ -126,7 +157,7 @@ export const csrfOriginProtection: RequestHandler = (req, _res, next) => {
     }
   }
 
-  if (requestOrigin && !allowedOrigins.has(requestOrigin)) {
+  if (requestOrigin && !corsOriginPolicy.isAllowedOrigin(requestOrigin)) {
     throw new AppError("Origin is not allowed for this authentication action", 403);
   }
 
