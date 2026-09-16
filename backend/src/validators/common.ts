@@ -16,7 +16,7 @@ export const emailSchema = z
 
 export const passwordSchema = z
   .string()
-  .min(12, PASSWORD_POLICY_MESSAGE)
+  .min(8, PASSWORD_POLICY_MESSAGE)
   .regex(/[a-z]/, PASSWORD_POLICY_MESSAGE)
   .regex(/[A-Z]/, PASSWORD_POLICY_MESSAGE)
   .regex(/\d/, PASSWORD_POLICY_MESSAGE)

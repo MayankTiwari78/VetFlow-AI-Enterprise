@@ -24,4 +24,4 @@ export const GENERIC_RECOVERY_RESPONSE =
   "If an account exists for that email, instructions will be sent shortly";
 
 export const PASSWORD_POLICY_MESSAGE =
-  "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol";
+  "Password must be at least 8 characters and include uppercase, lowercase, number, and special character";

@@ -3,6 +3,10 @@ import { Link } from '../lib/routerCompat'
 import BrandLogo from './BrandLogo'
 import { Heart, Mail, Phone, MapPin, ArrowUpRight } from 'lucide-react'
 
+const CONTACT_PHONE_DISPLAY = '+91 90000 00000'
+const CONTACT_PHONE_LINK = 'tel:+919000000000'
+const CONTACT_ADDRESS = 'Rajeev Chowk, Gurugram, Haryana, India, Block No. 778, Tower, Near Hero MotoCorp'
+
 const Footer = () => {
   return (
     <footer className='mt-20 border-t border-line/60 bg-white'>
@@ -62,15 +66,15 @@ const Footer = () => {
           <ul className='mt-5 flex flex-col gap-3 text-base text-muted'>
             <li className='flex items-center gap-3'>
               <Mail className='h-4 w-4 text-primary' />
-              support@medflow.ai
+              <a className='transition-colors hover:text-primary' href='mailto:support@medflow.ai'>support@medflow.ai</a>
             </li>
             <li className='flex items-center gap-3'>
               <Phone className='h-4 w-4 text-primary' />
-              (415) 555-0132
+              <a className='transition-colors hover:text-primary' href={CONTACT_PHONE_LINK}>{CONTACT_PHONE_DISPLAY}</a>
             </li>
             <li className='flex items-start gap-3'>
               <MapPin className='h-4 w-4 text-primary mt-0.5' />
-              <span>54709 Willms Station, Suite 350, Washington, USA</span>
+              <span>{CONTACT_ADDRESS}</span>
             </li>
           </ul>
         </div>

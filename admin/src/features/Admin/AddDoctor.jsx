@@ -5,6 +5,30 @@ import axios from 'axios'
 import { AdminContext } from '../../context/AdminContext'
 import { AppContext } from '../../context/AppContext'
 
+const PASSWORD_POLICY_MESSAGE =
+  'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.'
+
+const validatePassword = (password = '') => {
+  const value = String(password || '')
+  if (value.length < 8) return PASSWORD_POLICY_MESSAGE
+  if (!/[a-z]/.test(value)) return PASSWORD_POLICY_MESSAGE
+  if (!/[A-Z]/.test(value)) return PASSWORD_POLICY_MESSAGE
+  if (!/\d/.test(value)) return PASSWORD_POLICY_MESSAGE
+  if (!/[^A-Za-z0-9]/.test(value)) return PASSWORD_POLICY_MESSAGE
+  return null
+}
+
+const passwordRequirements = (password = '') => {
+  const value = String(password || '')
+  return [
+    { key: 'length', label: '8+ characters', met: value.length >= 8 },
+    { key: 'uppercase', label: 'Uppercase letter', met: /[A-Z]/.test(value) },
+    { key: 'lowercase', label: 'Lowercase letter', met: /[a-z]/.test(value) },
+    { key: 'number', label: 'Number', met: /\d/.test(value) },
+    { key: 'special', label: 'Special character', met: /[^A-Za-z0-9]/.test(value) },
+  ]
+}
+
 const AddDoctor = () => {
 
     const [docImg, setDocImg] = useState(false)
@@ -29,6 +53,11 @@ const AddDoctor = () => {
 
             if (!docImg) {
                 return toast.error('Image Not Selected')
+            }
+
+            const passwordError = validatePassword(password)
+            if (passwordError) {
+                return toast.error(passwordError)
             }
 
             const formData = new FormData();
@@ -97,7 +126,20 @@ const AddDoctor = () => {
 
                         <div className='flex-1 flex flex-col gap-1'>
                             <p>Set Password</p>
-                            <input onChange={e => setPassword(e.target.value)} value={password} className='portal-field' type="password" placeholder='Password' required />
+                            <input onChange={e => setPassword(e.target.value)} value={password} className='portal-field' type="password" placeholder='At least 8 characters with uppercase, lowercase, number & symbol' required />
+                            {password ? (
+                                <div className='mt-1 rounded-lg border border-slate-200 bg-slate-50 p-2.5'>
+                                    <p className='text-[11px] font-bold uppercase tracking-wide text-slate-500'>Password requirements</p>
+                                    <ul className='mt-1.5 grid gap-0.5 text-xs font-semibold'>
+                                        {passwordRequirements(password).map((item) => (
+                                            <li key={item.key} className={item.met ? 'text-emerald-700' : 'text-slate-500'}>
+                                                <span aria-hidden='true'>{item.met ? '✓' : '○'} </span>
+                                                {item.label}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
                         </div>
 
                         <div className='flex-1 flex flex-col gap-1'>

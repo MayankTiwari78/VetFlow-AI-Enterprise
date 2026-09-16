@@ -6,6 +6,8 @@ import { useNavigate } from '../lib/routerCompat'
 import { motion, AnimatePresence } from 'framer-motion'
 import { assets } from '../assets/assets'
 import BrandLogo from '../components/BrandLogo'
+import { PasswordRequirements } from '../components/PasswordRequirements'
+import { getPasswordRequirements, getPasswordStrength, validatePassword } from '../lib/password'
 import { Eye, EyeOff, Mail, Lock, User, PawPrint, Check, ArrowRight, Brain, CalendarCheck, FileText, ShieldCheck, Syringe } from 'lucide-react'
 
 const roles = [
@@ -31,20 +33,36 @@ const Register = () => {
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const passwordRequirements = getPasswordRequirements(formData.password)
+  const passwordStrength = getPasswordStrength(formData.password)
 
   const updateField = (field, value) => setFormData({ ...formData, [field]: value })
+
+          const validateAccountStep = () => {
+    const passwordError = validatePassword(formData.password)
+    if (passwordError) {
+      toast.error(passwordError)
+      return false
+    }
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match')
+      return false
+    }
+    return true
+  }
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
     if (!termsAccepted) {
       return
     }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match')
+    const passwordError = validatePassword(formData.password)
+    if (passwordError) {
+      toast.error(passwordError)
       return
     }
-    if (formData.password.length < 8) {
-      toast.error('Password must be at least 8 characters')
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match')
       return
     }
     setLoading(true)
@@ -73,8 +91,7 @@ const Register = () => {
       toast.error('Please fill in all fields')
       return
     }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match')
+    if (!validateAccountStep()) {
       return
     }
     setStep('profile')
@@ -102,7 +119,7 @@ const Register = () => {
             transition={{ delay: 0.1 }}
             className='mt-4 max-w-lg text-[40px] font-black leading-[1.08] sm:text-[44px]'
           >
-            Start Your Pet's Health Journey
+            Start Your Pet&apos;s Health Journey
           </motion.h1>
 
           <motion.p
@@ -228,11 +245,12 @@ const Register = () => {
                       Password
                     </label>
                     <div className='relative mt-1'>
-                      <input onChange={(e) => updateField('password', e.target.value)} value={formData.password} className='mf-field pr-12 !py-3' type={showPassword ? 'text' : 'password'} required autoComplete='new-password' placeholder='At least 8 characters' />
+                      <input onChange={(e) => updateField('password', e.target.value)} value={formData.password} className='mf-field pr-12 !py-3' type={showPassword ? 'text' : 'password'} required autoComplete='new-password' placeholder='At least 8 characters with uppercase, lowercase, number & symbol' />
                       <button type='button' onClick={() => setShowPassword(!showPassword)} className='absolute right-3 top-1/2 -translate-y-1/2 rounded-xl p-1.5 text-muted transition-all hover:bg-primary/5 hover:text-ink' aria-label={showPassword ? 'Hide password' : 'Show password'}>
                         {showPassword ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
                       </button>
                     </div>
+                    <PasswordRequirements password={formData.password} requirements={passwordRequirements} strength={passwordStrength} />
                   </div>
 
                   <div>

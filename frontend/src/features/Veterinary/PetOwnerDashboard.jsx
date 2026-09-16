@@ -13,6 +13,8 @@ import AiImageAssessment from './AiImageAssessment'
 import CombinedAssessment from './CombinedAssessment'
 import AiSymptomForm from './AiSymptomForm'
 import VeterinarianReviewSection from './VeterinarianReviewSection'
+import { PasswordRequirements } from '../../components/PasswordRequirements'
+import { getPasswordRequirements, getPasswordStrength, validatePassword } from '../../lib/password'
 import { pretty, formatDateTime, reportTimestamp, sortNewestFirst, downloadTextFile, imageEvidenceText, symptomEvidenceText, buildCombinedReportText } from './reportUtils'
 import AppointmentsView from './AppointmentsView'
 import MedicalHistoryPage from './MedicalHistoryPage'
@@ -1158,6 +1160,8 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
   const [securityModal, setSecurityModal] = useState('')
   const [changePasswordForm, setChangePasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [changePasswordError, setChangePasswordError] = useState('')
+  const changePasswordRequirements = getPasswordRequirements(changePasswordForm.newPassword)
+  const changePasswordStrength = getPasswordStrength(changePasswordForm.newPassword)
 
   const loadSecurity = async () => {
     if (!token) return
@@ -1255,8 +1259,9 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
       setChangePasswordError('Please fill in all password fields.')
       return
     }
-    if (newPassword.length < 8) {
-      setChangePasswordError('Password must be at least 8 characters.')
+    const passwordError = validatePassword(newPassword)
+    if (passwordError) {
+      setChangePasswordError(passwordError)
       return
     }
     if (newPassword !== confirmPassword) {
@@ -2541,7 +2546,8 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
             </div>
             <div>
               <label className='text-[13px] font-semibold text-ink'>New Password</label>
-              <input type='password' className='mf-field mt-1.5 !py-3' value={changePasswordForm.newPassword} onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} placeholder='At least 8 characters' />
+              <input type='password' className='mf-field mt-1.5 !py-3' value={changePasswordForm.newPassword} onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} placeholder='At least 8 characters with uppercase, lowercase, number & symbol' />
+              <PasswordRequirements password={changePasswordForm.newPassword} requirements={changePasswordRequirements} strength={changePasswordStrength} />
             </div>
             <div>
               <label className='text-[13px] font-semibold text-ink'>Confirm New Password</label>

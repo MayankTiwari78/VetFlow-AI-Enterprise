@@ -1,6 +1,9 @@
 import React from 'react'
 import { assets } from '../assets/assets'
 
+const CONTACT_PHONE_DISPLAY = '+91 90000 00000'
+const CONTACT_PHONE_LINK = 'tel:+919000000000'
+
 const Contact = () => {
   return (
     <main className='py-10 sm:py-14'>
@@ -15,12 +18,12 @@ const Contact = () => {
         <div className='flex flex-col justify-center gap-8 p-7 sm:p-10'>
           <div><p className='mf-eyebrow'>Veterinary support</p><h2 className='mt-2 text-2xl font-semibold text-ink'>We are here to help.</h2></div>
           <div className='grid gap-5 text-sm text-slate-600 sm:grid-cols-2'>
-            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Support</p><p className='mt-1'>support@vetflow.ai</p></div>
-            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Emergency Contact</p><p className='mt-1'>(415) 555-0132</p></div>
-            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Clinic Partnership</p><p className='mt-1'>partners@vetflow.ai</p></div>
-            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>General Inquiry</p><p className='mt-1'>hello@vetflow.ai</p></div>
-            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Phone</p><p className='mt-1'>(415) 555-0132</p></div>
-            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Location</p><p className='mt-1'>54709 Willms Station, Suite 350, Washington, USA</p></div>
+            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Support</p><p className='mt-1'><a className='transition-colors hover:text-primary' href='mailto:support@vetflow.ai'>support@vetflow.ai</a></p></div>
+            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Emergency Contact</p><p className='mt-1'><a className='transition-colors hover:text-primary' href={CONTACT_PHONE_LINK}>{CONTACT_PHONE_DISPLAY}</a> <span className='text-xs text-slate-500'>(demo number)</span></p></div>
+            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Clinic Partnership</p><p className='mt-1'><a className='transition-colors hover:text-primary' href='mailto:partners@vetflow.ai'>partners@vetflow.ai</a></p></div>
+            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>General Inquiry</p><p className='mt-1'><a className='transition-colors hover:text-primary' href='mailto:hello@vetflow.ai'>hello@vetflow.ai</a></p></div>
+            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Phone</p><p className='mt-1'><a className='transition-colors hover:text-primary' href={CONTACT_PHONE_LINK}>{CONTACT_PHONE_DISPLAY}</a> <span className='text-xs text-slate-500'>(demo number)</span></p></div>
+            <div className='border-l-2 border-teal pl-4'><p className='font-semibold text-ink'>Location</p><p className='mt-1'>Rajeev Chowk, Gurugram, Haryana, India, Block No. 778, Tower, Near Hero MotoCorp</p></div>
           </div>
           <p className='rounded-md bg-mist px-4 py-3 text-xs leading-5 text-slate-600'>For pet emergencies, contact your local emergency veterinary clinic immediately. VetFlow AI support does not provide emergency medical advice.</p>
         </div>

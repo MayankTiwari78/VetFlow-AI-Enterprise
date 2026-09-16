@@ -4,6 +4,8 @@ import { Link, useNavigate, useSearchParams } from '../lib/routerCompat'
 import { toast } from 'react-toastify'
 import { AppContext } from '../context/AppContext'
 import AuthShell from '../components/AuthShell'
+import { PasswordRequirements } from '../components/PasswordRequirements'
+import { getPasswordRequirements, getPasswordStrength, validatePassword } from '../lib/password'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 
 const ResetPassword = () => {
@@ -15,9 +17,20 @@ const ResetPassword = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const passwordRequirements = getPasswordRequirements(password)
+  const passwordStrength = getPasswordStrength(password)
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      toast.error(passwordError)
+      return
+    }
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
     setLoading(true)
 
     try {
@@ -53,7 +66,7 @@ const ResetPassword = () => {
               type={showPassword ? 'text' : 'password'}
               autoComplete='new-password'
               required
-              placeholder='At least 8 characters'
+              placeholder='At least 8 characters with uppercase, lowercase, number & symbol'
             />
             <button
               type='button'
@@ -64,6 +77,7 @@ const ResetPassword = () => {
               {showPassword ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
             </button>
           </div>
+          <PasswordRequirements password={password} requirements={passwordRequirements} strength={passwordStrength} />
         </div>
         <div>
           <label className='flex items-center gap-2 text-sm font-semibold text-ink'>
