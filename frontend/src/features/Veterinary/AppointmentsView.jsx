@@ -1,7 +1,6 @@
 "use client";
 
-import { useContext, useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import { useContext, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
   Search,
@@ -24,48 +23,41 @@ import {
 import { AppContext } from "../../context/AppContext";
 import { isAuthSessionHandledError } from "../../api/authClient";
 import { useNavigate } from "../../lib/routerCompat";
+import { publicEnv } from "../../lib/env";
 import {
   cleanVetName,
   displaySpeciality,
   clinicNameFor,
-  formatFee,
-  normalizeDoctor
+  formatFee
 } from "../../lib/veterinaryDisplay";
+import {
+  appointmentPetName,
+  cancelPatientAppointment,
+  canCancelAppointment,
+  canPayAppointment,
+  formatSlotDate,
+  getAppointmentDisplayStatus,
+  getAppointmentId,
+  isAppointmentPaid,
+  normalizeAppointment,
+  payAppointmentOnline
+} from "../../lib/appointmentApi";
 import AppointmentCard from "./AppointmentCard";
 
-const getId = (item) => String(item?._id || item?.id || "");
-
-const formatSlotDate = (value) => {
-  if (!value) return "Not scheduled";
-  if (typeof value === "string" && value.includes("_")) {
-    const parts = value.split("_").map(Number);
-    if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
-      const date = new Date(parts[2], parts[1] - 1, parts[0]);
-      if (!Number.isNaN(date.getTime())) {
-        return date.toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric"
-        });
-      }
-    }
-    return String(value);
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
-};
-
+// Display buckets shared with /my-appointments (see lib/appointmentApi): a scheduled appointment is
+// only "Upcoming" while its slot is in the future, otherwise it is "Past due".
 const STATUS_CONFIG = {
-  scheduled: {
+  upcoming: {
     label: "Upcoming",
     icon: Calendar,
     className: "bg-blue-50 text-blue-700 border-blue-200",
     dot: "bg-blue-500"
+  },
+  past: {
+    label: "Past due",
+    icon: AlertCircle,
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+    dot: "bg-amber-500"
   },
   completed: {
     label: "Completed",
@@ -84,27 +76,24 @@ const STATUS_CONFIG = {
 const TABS = [
   { id: "all", label: "All" },
   { id: "upcoming", label: "Upcoming" },
+  { id: "past", label: "Past" },
   { id: "completed", label: "Completed" },
   { id: "cancelled", label: "Cancelled" }
 ];
 
-const AppointmentDetailModal = ({ appointment, onClose, onCancel, onPay, currencySymbol }) => {
+const AppointmentDetailModal = ({ appointment, pets = [], onClose, onCancel, onPay, paying = false, currencySymbol }) => {
   const docData = appointment.docData || {};
   const vetName = cleanVetName(docData.name) || "Veterinarian";
   const speciality = displaySpeciality(docData.speciality);
   const clinic = clinicNameFor(docData);
   const fee = formatFee(appointment.amount || docData.fees, currencySymbol);
-  const status =
-    appointment.status ||
-    (appointment.cancelled
-      ? "cancelled"
-      : appointment.isCompleted
-        ? "completed"
-        : "scheduled");
-  const statusInfo = STATUS_CONFIG[status] || STATUS_CONFIG.scheduled;
+  const petName = appointmentPetName(appointment, pets);
+  const displayStatus = getAppointmentDisplayStatus(appointment);
+  const statusInfo = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.upcoming;
   const StatusIcon = statusInfo.icon;
-  const isScheduled = status === "scheduled";
-  const isPaid = Boolean(appointment.payment);
+  const isPaid = isAppointmentPaid(appointment);
+  const canPay = canPayAppointment(appointment) && Boolean(onPay);
+  const canCancel = canCancelAppointment(appointment) && Boolean(onCancel);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 py-6">
@@ -139,6 +128,12 @@ const AppointmentDetailModal = ({ appointment, onClose, onCancel, onPay, currenc
               <span className="text-muted">Time</span>
             </div>
             <span className="text-ink">{appointment.slotTime || "Not set"}</span>
+
+            <div className="flex items-center gap-2">
+              <Stethoscope className="h-4 w-4 text-muted" />
+              <span className="text-muted">Pet</span>
+            </div>
+            <span className="text-ink">{petName}</span>
 
             <div className="flex items-center gap-2">
               <Stethoscope className="h-4 w-4 text-muted" />
@@ -187,16 +182,17 @@ const AppointmentDetailModal = ({ appointment, onClose, onCancel, onPay, currenc
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3 border-t border-line/70 pt-5">
-          {isScheduled && !isPaid && onPay && (
+          {canPay && (
             <button
               type="button"
               onClick={onPay}
-              className="mf-button"
+              disabled={paying}
+              className="mf-button disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Pay now
+              {paying ? "Opening Razorpay..." : "Pay online"}
             </button>
           )}
-          {isScheduled && onCancel && (
+          {canCancel && (
             <button
               type="button"
               onClick={onCancel}
@@ -225,49 +221,39 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [detailModal, setDetailModal] = useState(null);
+  const [payingId, setPayingId] = useState("");
 
-  // Normalize appointments: normalize docData and derive status
-  const normalizedAppointments = useMemo(() => {
-    return rawAppointments.map((appt) => ({
-      ...appt,
-      docData: normalizeDoctor(appt.docData),
-      status:
-        appt.status ||
-        (appt.cancelled
-          ? "cancelled"
-          : appt.isCompleted
-            ? "completed"
-            : "scheduled")
-    }));
-  }, [rawAppointments]);
+  // Every appointment below is the canonical Appointment document returned by
+  // GET /api/user/appointments (the same records shown by /my-appointments).
+  const normalizedAppointments = useMemo(
+    () => rawAppointments.map((appt, index) => normalizeAppointment(appt, index)),
+    [rawAppointments]
+  );
 
-  // Count badges per tab
+  // Count badges per tab, using the shared display buckets for both views.
   const counts = useMemo(() => {
     const all = normalizedAppointments.length;
     const upcoming = normalizedAppointments.filter(
-      (a) => a.status === "scheduled"
+      (a) => getAppointmentDisplayStatus(a) === "upcoming"
+    ).length;
+    const past = normalizedAppointments.filter(
+      (a) => getAppointmentDisplayStatus(a) === "past"
     ).length;
     const completed = normalizedAppointments.filter(
-      (a) => a.status === "completed"
+      (a) => getAppointmentDisplayStatus(a) === "completed"
     ).length;
     const cancelled = normalizedAppointments.filter(
-      (a) => a.status === "cancelled"
+      (a) => getAppointmentDisplayStatus(a) === "cancelled"
     ).length;
-    return { all, upcoming, completed, cancelled };
+    return { all, upcoming, past, completed, cancelled };
   }, [normalizedAppointments]);
 
   // Filter by tab
   const tabFiltered = useMemo(() => {
-    switch (activeTab) {
-      case "upcoming":
-        return normalizedAppointments.filter((a) => a.status === "scheduled");
-      case "completed":
-        return normalizedAppointments.filter((a) => a.status === "completed");
-      case "cancelled":
-        return normalizedAppointments.filter((a) => a.status === "cancelled");
-      default:
-        return normalizedAppointments;
-    }
+    if (activeTab === "all") return normalizedAppointments;
+    return normalizedAppointments.filter(
+      (a) => getAppointmentDisplayStatus(a) === activeTab
+    );
   }, [activeTab, normalizedAppointments]);
 
   // Filter by search
@@ -275,7 +261,7 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
     if (!searchQuery.trim()) return tabFiltered;
     const q = searchQuery.toLowerCase();
     return tabFiltered.filter((a) => {
-      const petName = (a.petName || "").toLowerCase();
+      const petName = appointmentPetName(a, pets).toLowerCase();
       const vetName = cleanVetName(a.docData?.name || "").toLowerCase();
       const speciality = displaySpeciality(a.docData?.speciality || "").toLowerCase();
       const clinic = clinicNameFor(a.docData || "").toLowerCase();
@@ -290,22 +276,18 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
         time.includes(q)
       );
     });
-  }, [searchQuery, tabFiltered]);
+  }, [searchQuery, tabFiltered, pets]);
 
   const cancelAppointment = async (appointmentId) => {
-    if (!token) return;
+    if (!token || !appointmentId) return;
     try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/user/cancel-appointment`,
-        { appointmentId },
-        { headers: { token } }
-      );
-      if (data.success) {
+      const data = await cancelPatientAppointment({ backendUrl, token, appointmentId });
+      if (data?.success) {
         toast.success(data.message);
         setDetailModal(null);
-        if (onRefresh) onRefresh();
+        if (onRefresh) await onRefresh();
       } else {
-        toast.error(data.message);
+        toast.error(data?.message);
       }
     } catch (error) {
       if (!isAuthSessionHandledError(error)) {
@@ -314,9 +296,41 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
     }
   };
 
-  const handlePay = (appointmentId) => {
-    setDetailModal(null);
-    navigate(`/appointment/${appointmentId}`);
+  /**
+   * Pays the exact appointment shown in this view through the single shared Razorpay workflow:
+   * POST /api/user/payment-razorpay -> Razorpay Checkout -> POST /api/user/verifyRazorpay.
+   * No navigation and no locally invented appointment id.
+   */
+  const handlePay = async (appointmentId) => {
+    if (!token || !appointmentId || payingId) return;
+
+    setPayingId(appointmentId);
+    try {
+      const result = await payAppointmentOnline({
+        backendUrl,
+        token,
+        appointmentId,
+        razorpayKeyId: publicEnv.razorpayKeyId,
+        // Refetch the canonical list so the UI reflects the verified `payment = true` document.
+        onPaid: () => (onRefresh ? onRefresh() : undefined)
+      });
+
+      if (result.status === "paid") {
+        setDetailModal(null);
+        toast.success("Payment successful");
+      } else if (result.status === "cancelled") {
+        // User closed Razorpay - nothing charged, no error toast. The finally block below has
+        // already cleared payingId, so the button is "Pay online" again and can be re-clicked.
+      } else if (result.message) {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      if (!isAuthSessionHandledError(error)) {
+        toast.error(error.response?.data?.message || error.message);
+      }
+    } finally {
+      setPayingId("");
+    }
   };
 
   const handleDetails = (appt) => {
@@ -406,7 +420,7 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
               No appointments yet
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-              You don't have any appointments in this category.
+              You don&apos;t have any appointments in this category.
             </p>
             <button
               type="button"
@@ -419,12 +433,14 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
         ) : (
           searchFiltered.map((appt) => (
             <AppointmentCard
-              key={getId(appt)}
+              key={getAppointmentId(appt)}
               appointment={appt}
               pets={pets}
               currencySymbol={currencySymbol}
+              onPay={() => handlePay(getAppointmentId(appt))}
+              paying={payingId === getAppointmentId(appt)}
               onDetails={() => handleDetails(appt)}
-              onCancel={() => cancelAppointment(getId(appt))}
+              onCancel={() => cancelAppointment(getAppointmentId(appt))}
             />
           ))
         )}
@@ -436,8 +452,8 @@ const AppointmentsView = ({ appointments: rawAppointments, pets = [], onRefresh 
           appointment={detailModal}
           currencySymbol={currencySymbol}
           onClose={() => setDetailModal(null)}
-          onCancel={() => cancelAppointment(getId(detailModal))}
-          onPay={() => handlePay(getId(detailModal))}
+          onCancel={() => cancelAppointment(getAppointmentId(detailModal))}
+          onPay={() => handlePay(getAppointmentId(detailModal))}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import AppointmentModel, { type Appointment } from "../models/Appointment.js";
 import DoctorModel, { type Doctor } from "../models/Doctor.js";
+import PetModel from "../models/Pet.js";
 import UserModel, { type User } from "../models/User.js";
 import type { Address, PatientHealthProfile, UserProfileSnapshot } from "../types/domain.js";
 import { AppError } from "../utils/AppError.js";
@@ -25,6 +26,8 @@ type BookAppointmentPayload = {
   docId: string;
   slotDate: string;
   slotTime: string;
+  /** Optional pet being treated. Stored on the single appointment document as a snapshot. */
+  petId?: string;
 };
 
 type HealthProfileUpdatePayload = {
@@ -72,6 +75,24 @@ const assertAppointmentOrganization = (appointment: Appointment, organizationId?
   ) {
     throw new AppError("Appointment not found", 404);
   }
+};
+
+/**
+ * Resolve the pet that an appointment is booked for. The pet must belong to the booking patient;
+ * the appointment keeps referencing the existing pet document instead of duplicating pet data.
+ */
+const ensureOwnedPet = async (userId: string, petId: string) => {
+  const pet = await PetModel.findById(petId);
+
+  if (!pet) {
+    throw new AppError("Pet not found", 404);
+  }
+
+  if (String(pet.ownerId) !== userId) {
+    throw new AppError("Unauthorized action", 403);
+  }
+
+  return pet;
 };
 
 const releaseDoctorSlot = async (
@@ -186,6 +207,9 @@ export const bookPatientAppointment = async (
   const doctor = await ensureDoctor(payload.docId, organizationId);
   const slotDate = await assertBookableDoctorSlot(doctor, payload.slotDate, payload.slotTime);
 
+  const requestedPetId = payload.petId?.trim() ?? "";
+  const pet = requestedPetId ? await ensureOwnedPet(userId, requestedPetId) : null;
+
   const user = await ensureUser(userId);
   const resolvedOrganizationId = organizationId ?? doctor.organizationId ?? user.organizationId;
   const userData: UserProfileSnapshot = {
@@ -207,6 +231,7 @@ export const bookPatientAppointment = async (
       docId: payload.docId,
       userData,
       docData,
+      ...(pet ? { petId: String(pet._id), petName: pet.name } : {}),
       amount: doctor.fees,
       organizationId: resolvedOrganizationId,
       slotTime: payload.slotTime,

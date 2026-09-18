@@ -69,7 +69,25 @@ const MyAppointments = () => {
 
     }
 
+    const RAZORPAY_PLACEHOLDER_KEY = 'rzp_test_placeholder'
+
     const initPay = (order) => {
+        if (!order || !order.id) {
+            toast.error('Payment could not be started: the server did not return a Razorpay order.')
+            return
+        }
+        // Razorpay Checkout must be opened with the same Key ID that created the order on the
+        // backend, otherwise Razorpay rejects the payment. A placeholder value means
+        // NEXT_PUBLIC_RAZORPAY_KEY_ID was never configured for the frontend.
+        if (!publicEnv.razorpayKeyId || publicEnv.razorpayKeyId === RAZORPAY_PLACEHOLDER_KEY) {
+            toast.error('Razorpay is not configured for this website. Set NEXT_PUBLIC_RAZORPAY_KEY_ID in frontend/.env to the same Key ID the backend uses, then restart the frontend.')
+            return
+        }
+        if (typeof window === 'undefined' || !window.Razorpay) {
+            toast.error('The payment service is unavailable. Please try again.')
+            return
+        }
+
         const options = {
             key: publicEnv.razorpayKeyId,
             amount: order.amount,
@@ -92,12 +110,21 @@ const MyAppointments = () => {
                     console.log(error)
                     if (!isAuthSessionHandledError(error)) toast.error(error.message)
                 }
+            },
+            "payment.failed": (failure) => {
+                // Diagnostic only - no keys or secrets are logged. Razorpay reports the real
+                // reason here (e.g. BAD_REQUEST_ERROR / invalid key / order not found).
+                const detail = failure && failure.error ? failure.error : {}
+                console.error('Razorpay payment.failed', {
+                    code: detail.code,
+                    description: detail.description,
+                    source: detail.source,
+                    step: detail.step,
+                    reason: detail.reason,
+                    orderId: detail.metadata && detail.metadata.order_id ? detail.metadata.order_id : undefined
+                })
             }
         };
-        if (typeof window === 'undefined' || !window.Razorpay) {
-            toast.error('The payment service is unavailable. Please try again.')
-            return
-        }
         const rzp = new window.Razorpay(options);
         rzp.open();
     };

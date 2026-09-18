@@ -19,13 +19,28 @@ import {
   clinicNameFor,
   formatFee
 } from "../../lib/veterinaryDisplay";
+import {
+  appointmentPetName,
+  canPayAppointment,
+  findAppointmentPet,
+  formatSlotDate,
+  getAppointmentDisplayStatus,
+  isAppointmentPaymentPending
+} from "../../lib/appointmentApi";
 
+// Display buckets are shared with every other appointment view (see lib/appointmentApi).
 const STATUS_CONFIG = {
-  scheduled: {
+  upcoming: {
     label: "Upcoming",
     icon: Calendar,
     className: "bg-blue-50 text-blue-700 border-blue-200",
     dot: "bg-blue-500"
+  },
+  past: {
+    label: "Past due",
+    icon: AlertCircle,
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+    dot: "bg-amber-500"
   },
   completed: {
     label: "Completed",
@@ -39,31 +54,6 @@ const STATUS_CONFIG = {
     className: "bg-red-50 text-red-700 border-red-200",
     dot: "bg-red-500"
   }
-};
-
-const formatSlotDate = (value) => {
-  if (!value) return "Not scheduled";
-  if (typeof value === "string" && value.includes("_")) {
-    const parts = value.split("_").map(Number);
-    if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
-      const date = new Date(parts[2], parts[1] - 1, parts[0]);
-      if (!Number.isNaN(date.getTime())) {
-        return date.toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric"
-        });
-      }
-    }
-    return String(value);
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
 };
 
 const formatTime = (value) => {
@@ -107,31 +97,26 @@ const AppointmentCard = ({
   currencySymbol = "INR ",
   onDetails,
   onCancel,
-  onPay
+  onPay,
+  paying = false
 }) => {
   const docData = appointment.docData || {};
   const vetName = cleanVetName(docData.name) || "Veterinarian";
   const speciality = displaySpeciality(docData.speciality);
   const clinic = clinicNameFor(docData);
   const fee = formatFee(appointment.amount || docData.fees, currencySymbol);
-  const status =
-    appointment.status ||
-    (appointment.cancelled
-      ? "cancelled"
-      : appointment.isCompleted
-        ? "completed"
-        : "scheduled");
-  const petName = appointment.petName || "Your Pet";
+  // Lifecycle bucket and payment state both come from the canonical appointment document.
+  const displayStatus = getAppointmentDisplayStatus(appointment);
+  const statusInfo = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.upcoming;
+  const petName = appointmentPetName(appointment, pets);
   const slotDate = formatSlotDate(appointment.slotDate);
   const slotTime = formatTime(appointment.slotTime);
-  const statusInfo = STATUS_CONFIG[status] || STATUS_CONFIG.scheduled;
-  const StatusIcon = statusInfo.icon;
 
-  const pet = pets.find((p) => p.name === petName);
+  const pet = findAppointmentPet(appointment, pets);
   const petImage = pet?.profileImage;
 
-  const isScheduled = status === "scheduled";
-  const isPaid = Boolean(appointment.payment);
+  const paymentPending = isAppointmentPaymentPending(appointment);
+  const canPay = canPayAppointment(appointment) && typeof onPay === "function";
 
   return (
     <div className="group mf-card p-5 transition-shadow duration-200 hover:shadow-card-hover">
@@ -173,7 +158,7 @@ const AppointmentCard = ({
         <div className="flex flex-col items-start gap-3 sm:items-end">
           <div className="text-right">
             <p className="text-lg font-bold text-ink">{fee || "—"}</p>
-            {!isPaid && isScheduled && (
+            {paymentPending && (
               <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
                 <AlertCircle className="h-3 w-3" />
                 Payment pending
@@ -188,14 +173,28 @@ const AppointmentCard = ({
             {statusInfo.label}
           </span>
 
-          <button
-            type="button"
-            onClick={onDetails}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-teal transition-colors hover:text-teal/80"
-          >
-            Details
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            {canPay && (
+              <button
+                type="button"
+                onClick={onPay}
+                disabled={paying}
+                title={`Pay ${fee || "the appointment fee"} online for this appointment`}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-teal px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-teal/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CreditCard className="h-4 w-4" />
+                {paying ? "Opening..." : "Pay online"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onDetails}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-teal transition-colors hover:text-teal/80"
+            >
+              Details
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

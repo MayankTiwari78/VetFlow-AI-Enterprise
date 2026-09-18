@@ -16,7 +16,10 @@ export const bookAppointmentSchema = z.object({
     .string()
     .trim()
     .regex(/^(?:\d{4}-\d{2}-\d{2}|\d{1,2}_\d{1,2}_\d{4})$/, "Invalid slot date"),
-  slotTime: z.string().trim().regex(/^\d{2}:\d{2}$/, "Invalid slot time")
+  slotTime: z.string().trim().regex(/^\d{2}:\d{2}$/, "Invalid slot time"),
+  // Optional reference to one of the patient's own pets. The service resolves it and stores the
+  // pet snapshot on the single canonical appointment document.
+  petId: z.union([objectIdSchema, z.literal("")]).optional()
 });
 
 const optionalDateSchema = z

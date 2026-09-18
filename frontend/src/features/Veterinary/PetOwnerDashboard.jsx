@@ -1507,6 +1507,8 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
         <MedicalHistoryPage
           pets={pets}
           records={records}
+          vaccinations={vaccinations}
+          reports={reports}
           onMyPets={() => navigate('/pet-owner/pets')}
           onBrowseVets={() => navigate('/pet-owner/veterinarians')}
           onRegisterPet={() => navigate('/pet-owner/pets/register')}

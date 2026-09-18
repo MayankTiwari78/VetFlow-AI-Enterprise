@@ -9,6 +9,10 @@ export interface Appointment {
   slotTime: string;
   userData: UserProfileSnapshot;
   docData: DoctorSnapshot;
+  // Snapshot of the treated pet. Optional so that appointment documents created before the
+  // pet-aware booking flow stay readable (they are never duplicated or migrated).
+  petId?: string;
+  petName?: string;
   amount: number;
   date: number;
   cancelled: boolean;
@@ -36,6 +40,8 @@ const appointmentSchema = new mongoose.Schema<Appointment>(
     slotTime: { type: String, required: true },
     userData: { type: mongoose.Schema.Types.Mixed, required: true },
     docData: { type: mongoose.Schema.Types.Mixed, required: true },
+    petId: { type: String, index: true },
+    petName: { type: String },
     amount: { type: Number, required: true },
     date: { type: Number, required: true },
     cancelled: { type: Boolean, default: false },
@@ -60,6 +66,7 @@ const appointmentSchema = new mongoose.Schema<Appointment>(
 
 appointmentSchema.index({ userId: 1 });
 appointmentSchema.index({ docId: 1 });
+appointmentSchema.index({ userId: 1, petId: 1 });
 appointmentSchema.index({ organizationId: 1, userId: 1 });
 appointmentSchema.index({ organizationId: 1, docId: 1 });
 appointmentSchema.index({ slotDate: 1, cancelled: 1, isCompleted: 1 });

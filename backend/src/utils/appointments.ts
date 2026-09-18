@@ -35,6 +35,18 @@ export const getAppointmentStatus = (
   return "scheduled";
 };
 
+/**
+ * A scheduled appointment is only "upcoming" while its slot is still in the future. Lifecycle
+ * status stays authoritative; this is a derived, read-only classification so that every client
+ * view (pet-owner dashboard and /my-appointments) reports the same bucket for the same document.
+ */
+export const isUpcomingAppointment = (
+  appointment: Pick<Appointment, "status" | "cancelled" | "isCompleted" | "slotDate" | "slotTime">,
+  now = new Date()
+): boolean =>
+  getAppointmentStatus(appointment) === "scheduled" &&
+  isFutureSlot(appointment.slotDate, appointment.slotTime, now);
+
 const stripPrivateHealthSnapshot = (userData: unknown): Record<string, unknown> => {
   const safe = toPlain(userData);
   delete safe.healthProfile;
@@ -52,7 +64,16 @@ export const sanitizeAppointmentForPatient = (appointment: unknown): Record<stri
   delete safe.clinicalNotesUpdatedAt;
   delete safe.patientSummary;
   safe.userData = stripPrivateHealthSnapshot(safe.userData);
-  safe.status = getAppointmentStatus(safe as unknown as Appointment);
+  const status = getAppointmentStatus(safe as unknown as Appointment);
+  safe.status = status;
+  // Derived, read-only payment/lifecycle classification. The stored `payment`, `cancelled`,
+  // `isCompleted` and `status` fields remain the single source of truth; every client view renders
+  // these same derived flags so the two appointment pages cannot disagree.
+  const upcoming = isUpcomingAppointment(safe as unknown as Appointment);
+  safe.isUpcoming = upcoming;
+  safe.isPast = status === "scheduled" && !upcoming;
+  safe.isPaid = safe.payment === true;
+  safe.isPaymentPending = safe.isPaid !== true && status !== "cancelled";
   return safe;
 };
 

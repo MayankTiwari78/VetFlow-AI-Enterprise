@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 
+import type Stripe from "stripe";
+
 import { env } from "../config/env.js";
 import { getRazorpayClient, getStripeClient } from "../config/payments.js";
 import { AppError } from "../utils/AppError.js";
@@ -35,11 +37,17 @@ export const createRazorpayOrder = async (
     return order;
   }
 
-  const order = (await getRazorpayClient().orders.create({
-    amount: appointment.amount * 100,
-    currency: env.CURRENCY,
-    receipt: appointmentId
-  })) as RazorpayOrder;
+  let order: RazorpayOrder;
+
+  try {
+    order = (await getRazorpayClient().orders.create({
+      amount: appointment.amount * 100,
+      currency: env.CURRENCY,
+      receipt: appointmentId
+    })) as RazorpayOrder;
+  } catch (error) {
+    throw providerRequestFailed("Razorpay", error);
+  }
 
   await markAppointmentPaymentReference(appointmentId, { razorpayOrderId: order.id });
   return order;
@@ -55,7 +63,57 @@ const validateRazorpaySignature = (
     .update(`${orderId}|${paymentId}`)
     .digest("hex");
 
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const providedBuffer = Buffer.from(signature, "utf8");
+
+  // crypto.timingSafeEqual throws a RangeError when the buffers differ in length, which the
+  // global error handler would report as an opaque HTTP 500. A signature of the wrong length
+  // can never be valid, so reject it before comparing.
+  if (expectedBuffer.length !== providedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+};
+
+type ProviderErrorResponse = {
+  statusCode?: number;
+  error?: {
+    code?: string;
+    description?: string;
+  };
+};
+
+/**
+ * The Razorpay SDK rejects with a plain object ({ statusCode, error: { code, description } })
+ * and Stripe rejects with an Error subclass. Neither is an AppError, so provider failures used
+ * to be reported as a generic HTTP 500. Translate them into an accurate status instead.
+ * Only the provider's own description is forwarded - credentials are never included.
+ */
+const providerRequestFailed = (provider: "Razorpay" | "Stripe", error: unknown): AppError => {
+  if (error instanceof AppError) {
+    return error;
+  }
+
+  const providerError =
+    error && typeof error === "object" && "error" in error
+      ? (error as ProviderErrorResponse)
+      : undefined;
+
+  if (providerError) {
+    const description = providerError.error?.description;
+    const statusCode = providerError.statusCode === 400 ? 400 : 502;
+    return new AppError(
+      `${provider} request failed${description ? `: ${description}` : ""}`,
+      statusCode
+    );
+  }
+
+  if (error instanceof Error) {
+    return new AppError(`${provider} request failed (${error.name})`, 502);
+  }
+
+  return new AppError(`${provider} request failed`, 502);
 };
 
 export const verifyRazorpayPayment = async (
@@ -73,9 +131,21 @@ export const verifyRazorpayPayment = async (
     throw new AppError("Payment verification failed", 400);
   }
 
-  const orderInfo = env.isTest
-    ? ({ id: orderId, receipt: "000000000000000000000003", status: "paid" } as RazorpayOrder)
-    : ((await getRazorpayClient().orders.fetch(orderId)) as RazorpayOrder);
+  let orderInfo: RazorpayOrder;
+
+  if (env.isTest) {
+    orderInfo = {
+      id: orderId,
+      receipt: "000000000000000000000003",
+      status: "paid"
+    } as RazorpayOrder;
+  } else {
+    try {
+      orderInfo = (await getRazorpayClient().orders.fetch(orderId)) as RazorpayOrder;
+    } catch (error) {
+      throw providerRequestFailed("Razorpay", error);
+    }
+  }
 
   if (!orderInfo.receipt) {
     throw new AppError("Payment receipt missing", 400);
@@ -108,27 +178,33 @@ export const createStripeCheckoutSession = async (
     return `${safeOrigin}/verify?success=true&appointmentId=${appointmentId}&session_id=cs_test`;
   }
 
-  const session = await getStripeClient().checkout.sessions.create({
-    success_url: `${safeOrigin}/verify?success=true&appointmentId=${appointmentId}&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${safeOrigin}/verify?success=false&appointmentId=${appointmentId}`,
-    line_items: [
-      {
-        price_data: {
-          currency: env.CURRENCY.toLowerCase(),
-          product_data: {
-            name: "Appointment Fees"
+  let session: Stripe.Checkout.Session;
+
+  try {
+    session = await getStripeClient().checkout.sessions.create({
+      success_url: `${safeOrigin}/verify?success=true&appointmentId=${appointmentId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${safeOrigin}/verify?success=false&appointmentId=${appointmentId}`,
+      line_items: [
+        {
+          price_data: {
+            currency: env.CURRENCY.toLowerCase(),
+            product_data: {
+              name: "Appointment Fees"
+            },
+            unit_amount: appointment.amount * 100
           },
-          unit_amount: appointment.amount * 100
-        },
-        quantity: 1
+          quantity: 1
+        }
+      ],
+      mode: "payment",
+      metadata: {
+        appointmentId,
+        userId
       }
-    ],
-    mode: "payment",
-    metadata: {
-      appointmentId,
-      userId
-    }
-  });
+    });
+  } catch (error) {
+    throw providerRequestFailed("Stripe", error);
+  }
 
   if (!session.url || !session.id) {
     throw new AppError("Unable to initialize Stripe payment", 502);
@@ -162,7 +238,14 @@ export const verifyStripePayment = async (
     return;
   }
 
-  const session = await getStripeClient().checkout.sessions.retrieve(sessionId);
+  let session: Stripe.Checkout.Session;
+
+  try {
+    session = await getStripeClient().checkout.sessions.retrieve(sessionId);
+  } catch (error) {
+    throw providerRequestFailed("Stripe", error);
+  }
+
   const metadata = session.metadata ?? {};
 
   if (metadata.appointmentId !== appointmentId || metadata.userId !== userId) {
