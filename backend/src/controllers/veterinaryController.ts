@@ -18,6 +18,7 @@ import {
   deleteVaccination,
   deleteVeterinarian,
   getAiReportById,
+  getMedicalHistoryTimeline,
   getOverdueVaccinations,
   getPetById,
   getPetHistory,
@@ -463,4 +464,16 @@ export const nearbyVeterinarianList: RequestHandler = asyncHandler(async (req, r
     req.query as Parameters<typeof nearbyVeterinarians>[1]
   );
   sendSuccess(res, 200, "Nearby veterinarians loaded", { veterinarians });
+});
+
+// ======== Medical History — unified longitudinal clinical timeline ========
+
+/** GET /veterinary/pets/:petId/medical-history — unified clinical timeline. */
+export const petMedicalHistoryTimeline: RequestHandler = asyncHandler(async (req, res) => {
+  const timeline = await getMedicalHistoryTimeline(
+    veterinaryActorFromRequest(req),
+    req.params.petId as string,
+    req.query as Parameters<typeof getMedicalHistoryTimeline>[2]
+  );
+  sendSuccess(res, 200, "Medical history timeline loaded", listPayload("timeline", timeline));
 });

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
 import {
   Activity,
   ArrowRight,
@@ -26,7 +27,41 @@ const asArray = (items) => (Array.isArray(items) ? items : [])
 const KIND = {
   MEDICAL_RECORD: 'medical-record',
   VACCINATION: 'vaccination',
-  AI_REPORT: 'ai-report'
+  AI_REPORT: 'ai-report',
+  PRESCRIPTION: 'prescription',
+  CONSULTATION: 'consultation'
+}
+
+// Clear, clinically-meaningful labels for every timeline record type.
+const RECORD_TYPE_LABELS = {
+  'medical-record': 'Visit',
+  'diagnosis': 'Diagnosis',
+  'treatment': 'Treatment',
+  'prescription': 'Prescription',
+  'medication': 'Medication',
+  'vaccination': 'Vaccination',
+  'ai-report': 'AI Assessment',
+  'consultation': 'Consultation',
+  'follow-up': 'Follow-up'
+}
+
+// Distinct badge tones per record type so the timeline is scannable at a glance.
+const RECORD_TYPE_TONES = {
+  'medical-record': 'bg-teal/10 text-teal',
+  'prescription': 'bg-indigo-50 text-indigo-700',
+  'medication': 'bg-rose-50 text-rose-700',
+  'vaccination': 'bg-amber-50 text-amber-700',
+  'ai-report': 'bg-violet-50 text-violet-700',
+  'consultation': 'bg-sky-50 text-sky-700'
+}
+
+const RECORD_TYPE_ICONS = {
+  'medical-record': Stethoscope,
+  'prescription': Pill,
+  'medication': Pill,
+  'vaccination': Syringe,
+  'ai-report': Brain,
+  'consultation': UserRound
 }
 
 // Category labels for filter dropdown (combines visit types + vaccination categories + AI modalities)
@@ -37,7 +72,11 @@ const ALL_VISIT_TYPES = [
   'Vaccination',
   'Dental Care',
   'Surgery',
-  'Follow-up'
+  'Follow-up',
+  'Diagnosis',
+  'Treatment',
+  'Prescription',
+  'Medication'
 ]
 
 const ALL_VACCINATION_CATEGORIES = [
@@ -128,6 +167,18 @@ const recordDate = (record, kind) => {
     if (record.createdAt) return new Date(record.createdAt)
     return new Date()
   }
+  if (kind === KIND.PRESCRIPTION) {
+    // For finalized prescriptions, use issuedAt (veterinarian issue time)
+    if (record.issuedAt) return new Date(record.issuedAt)
+    if (record.createdAt) return new Date(record.createdAt)
+    return new Date()
+  }
+  if (kind === KIND.CONSULTATION) {
+    // For consultation requests, use requestedAt
+    if (record.requestedAt) return new Date(record.requestedAt)
+    if (record.createdAt) return new Date(record.createdAt)
+    return new Date()
+  }
   // Medical record: use visitDate
   if (record.visitDate) return new Date(record.visitDate)
   return new Date()
@@ -141,6 +192,63 @@ const formatRecordDate = (record, kind, includeYear = true) => {
     ? { year: 'numeric', month: 'short', day: 'numeric' }
     : { month: 'short', day: 'numeric' }
   return dateValue.toLocaleDateString(undefined, options)
+}
+/**
+ * Normalize a single item returned by the unified medical-history API
+ * (GET /veterinary/pets/:petId/medical-history) into the page's internal
+ * timeline shape. Keeps every record type distinguishable and preserves the
+ * AI-assessment vs veterinarian-decision separation.
+ */
+const normalizeTimelineApiItem = (item) => {
+  const kind = item?.kind || KIND.MEDICAL_RECORD
+  const date = item?.date ? new Date(item.date) : item?.visitDate ? new Date(item.visitDate) : new Date()
+  return {
+    ...item,
+    kind,
+    _date: Number.isNaN(date.getTime()) ? new Date() : date,
+    id: item?._id || item?.id
+  }
+}
+
+/** Resolve a display name for the veterinarian on a timeline record. */
+const recordVeterinarian = (record) => {
+  if (!record) return 'Veterinary care team'
+  if (typeof record.veterinarian === 'string' && record.veterinarian) return record.veterinarian
+  if (record.veterinarian?.name) return record.veterinarian.name
+  if (record.veterinarianName) return record.veterinarianName
+  return 'Veterinary care team'
+}
+
+/** Resolve the clinic name when the record carries one. */
+const recordClinic = (record) => {
+  if (!record) return 'Not recorded'
+  if (record.clinic) return record.clinic
+  if (record.veterinarian?.clinicName) return record.veterinarian.clinicName
+  return 'Not recorded'
+}
+
+/** Human label for a prescription lifecycle status. */
+const prescriptionStatusLabel = (status) => {
+  if (status === 'completed') return 'Completed'
+  if (status === 'revoked') return 'Revoked'
+  return 'Active'
+}
+
+/** Tone for a prescription lifecycle status badge. */
+const prescriptionStatusTone = (status) => {
+  if (status === 'completed') return 'bg-slate-100 text-slate-600'
+  if (status === 'revoked') return 'bg-rose-100 text-rose-700'
+  return 'bg-emerald-100 text-emerald-700'
+}
+
+/** Human label for the veterinarian review status of an AI assessment. */
+const reviewStatusTone = (status) => {
+  if (status === 'approved' || status === 'reviewed') return 'bg-emerald-100 text-emerald-700'
+  if (status === 'modified') return 'bg-sky-100 text-sky-700'
+  if (status === 'dismissed') return 'bg-slate-100 text-slate-600'
+  if (status === 'consultation_required') return 'bg-sky-100 text-sky-700'
+  if (status === 'in_review') return 'bg-amber-100 text-amber-800'
+  return 'bg-amber-100 text-amber-800'
 }
 
 const PetImage = ({ src, alt, className, fallbackClassName }) => {
@@ -331,6 +439,203 @@ const MedicationList = ({ title, icon: Icon, items, nameKey, tone }) => (
     </ul>
   </div>
 )
+/** Clear record-type badge used across every timeline card header. */
+const RecordTypeBadge = ({ kind, label, tone }) => {
+  const Icon = RECORD_TYPE_ICONS[kind] || ClipboardList
+  const resolvedLabel = label || RECORD_TYPE_LABELS[kind] || 'Record'
+  const resolvedTone = tone || RECORD_TYPE_TONES[kind] || 'bg-teal/10 text-teal'
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${resolvedTone}`}>
+      <Icon className="h-3 w-3" strokeWidth={2.4} />
+      {resolvedLabel}
+    </span>
+  )
+}
+
+/**
+ * Selected-pet clinical header: identity, health status, last visit and a
+ * quick record count summary. Static baseline profile data stays in Health
+ * Profile — this header only summarises the clinical timeline.
+ */
+const ClinicalHeader = ({ pet, records }) => {
+  if (!pet) return null
+  const source = (records || []).filter((record) => record._date)
+  const latest = source
+    .map((record) => record._date)
+    .filter((date) => date instanceof Date && !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0]
+
+  const status = String(pet.vaccinationStatus || '').toLowerCase()
+  const isHealthy = status === 'up-to-date' || status === 'healthy' || status === 'good'
+  const isAttention =
+    status === 'needs attention' || status === 'overdue' || status === 'due' || status === 'attention' || status === 'partial'
+  const healthLabel = isHealthy ? 'Healthy' : isAttention ? 'Needs attention' : pet.vaccinationStatus || 'Unknown'
+  const healthTone = isHealthy
+    ? 'bg-emerald-100 text-emerald-700'
+    : isAttention
+      ? 'bg-amber-100 text-amber-800'
+      : 'bg-slate-100 text-slate-600'
+
+  const counts = source.reduce((acc, record) => {
+    acc[record.kind] = (acc[record.kind] || 0) + 1
+    return acc
+  }, {})
+
+  return (
+    <section className="overflow-hidden rounded-[20px] border border-line/70 bg-white shadow-soft">
+      <div className="flex flex-col gap-5 border-b border-line/70 p-5 sm:flex-row sm:items-center sm:p-6">
+        <PetImage
+          src={pet.profileImage}
+          alt={pet.name}
+          className="h-16 w-16 rounded-2xl object-cover"
+          fallbackClassName="bg-teal/10 text-teal text-xl"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="truncate text-xl font-extrabold text-ink">{pet.name || 'Selected pet'}</h2>
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${healthTone}`}>{healthLabel}</span>
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            {[pet.species, pet.breed, pet.gender].filter(Boolean).join(' · ') || 'Profile details pending'}
+          </p>
+        </div>
+        <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryItem icon={Calendar} label="Last visit" value={latest ? formatDate(latest) : 'No visits yet'} />
+          <SummaryItem icon={Stethoscope} label="Visits" value={String(counts[KIND.MEDICAL_RECORD] || 0)} />
+          <SummaryItem icon={Syringe} label="Vaccinations" value={String(counts[KIND.VACCINATION] || 0)} />
+          <SummaryItem icon={Brain} label="AI assessments" value={String(counts[KIND.AI_REPORT] || 0)} />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 text-xs font-semibold text-muted sm:px-6">
+        <span className="inline-flex items-center gap-1.5">
+          <Pill className="h-3.5 w-3.5 text-teal" /> {counts[KIND.PRESCRIPTION] || 0} veterinarian prescription(s)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <UserRound className="h-3.5 w-3.5 text-teal" /> {counts[KIND.CONSULTATION] || 0} consultation request(s)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5 text-teal" /> {source.length} total clinical event(s)
+        </span>
+      </div>
+    </section>
+  )
+}
+/**
+ * Veterinarian-finalized prescription. Always visually distinct from AI
+ * preliminary recommendations: it carries explicit vet attribution.
+ */
+const PrescriptionCard = ({ record }) => (
+  <article className="group overflow-hidden rounded-[20px] border border-line/70 bg-white shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-card-hover">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line/70 px-5 py-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
+          <Pill className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <RecordTypeBadge kind={KIND.PRESCRIPTION} />
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${prescriptionStatusTone(record.status)}`}>
+              {prescriptionStatusLabel(record.status)}
+            </span>
+          </div>
+          <h3 className="mt-1.5 truncate text-base font-extrabold text-ink">
+            {record.medicineName || 'Prescription'}
+          </h3>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Calendar className="h-4 w-4 text-slate-400" />
+        <p className="text-sm font-bold text-muted">{formatRecordDate(record, KIND.PRESCRIPTION)}</p>
+      </div>
+    </div>
+
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5 sm:px-6">
+      <div className="flex items-center gap-2 text-sm">
+        <UserRound className="h-4 w-4 text-slate-400" />
+        <span className="font-semibold text-ink">{recordVeterinarian(record)}</span>
+        <span className="text-xs font-bold text-indigo-600">Veterinarian approved</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <ClipboardList className="h-4 w-4 text-slate-400" />
+        <span className="text-muted">{recordClinic(record)}</span>
+      </div>
+    </div>
+
+    <div className="grid gap-3 px-5 pb-4 sm:px-6 lg:grid-cols-2">
+      <SectionGrid icon={Pill} title="Dosage" emptyText="Not recorded" children={record.dosage || 'Not recorded'} />
+      <SectionGrid icon={CalendarClock} title="Frequency" emptyText="Not recorded" children={record.frequency || 'Not recorded'} />
+      <SectionGrid icon={ClipboardList} title="Duration" emptyText="Not recorded" children={record.duration || 'Not recorded'} />
+      <SectionGrid icon={Stethoscope} title="Route" emptyText="Not recorded" children={record.route || 'Not recorded'} />
+      {record.additionalInstructions && (
+        <div className="lg:col-span-2">
+          <SectionGrid icon={ClipboardList} title="Instructions" emptyText="No instructions" children={record.additionalInstructions} />
+        </div>
+      )}
+    </div>
+
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 px-5 py-3.5 sm:px-6">
+      <p className="text-xs font-semibold text-muted">
+        Finalized by a licensed veterinarian — a clinical decision, not an AI recommendation.
+      </p>
+      {record.aiReportId && (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">
+          <Brain className="h-3.5 w-3.5" />
+          Based on AI assessment
+        </span>
+      )}
+    </div>
+  </article>
+)
+
+/** Consultation request created by the owner and progressed by a veterinarian. */
+const ConsultationCard = ({ record }) => {
+  const statusLabel = {
+    requested: 'Requested',
+    scheduled: 'Scheduled',
+    completed: 'Completed',
+    cancelled: 'Cancelled'
+  }[record.status] || record.status || 'Requested'
+
+  return (
+    <article className="group overflow-hidden rounded-[20px] border border-line/70 bg-white shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-card-hover">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line/70 px-5 py-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+            <UserRound className="h-5 w-5" strokeWidth={2} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <RecordTypeBadge kind={KIND.CONSULTATION} />
+              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-600">
+                {statusLabel}
+              </span>
+            </div>
+            <h3 className="mt-1.5 truncate text-base font-extrabold text-ink">Veterinary consultation</h3>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Calendar className="h-4 w-4 text-slate-400" />
+          <p className="text-sm font-bold text-muted">{formatRecordDate(record, KIND.CONSULTATION)}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 px-5 py-4 sm:px-6 lg:grid-cols-2">
+        <SectionGrid icon={UserRound} title="Veterinarian" emptyText="Not assigned" children={recordVeterinarian(record)} />
+        <SectionGrid icon={ClipboardList} title="Reason" emptyText="No reason recorded" children={record.reason || 'No reason recorded'} />
+        {record.preferredDates?.length > 0 && (
+          <div className="lg:col-span-2">
+            <SectionGrid icon={CalendarClock} title="Preferred dates" emptyText="None" children={listText(record.preferredDates)} />
+          </div>
+        )}
+        {record.notes && (
+          <div className="lg:col-span-2">
+            <SectionGrid icon={FileText} title="Notes" emptyText="No notes" children={record.notes} />
+          </div>
+        )}
+      </div>
+    </article>
+  )
+}
 
 const MedicalRecordCard = ({ record }) => {
   const [expanded, setExpanded] = useState(false)
@@ -351,10 +656,18 @@ const MedicalRecordCard = ({ record }) => {
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-mist text-teal">
             <Stethoscope className="h-5 w-5" strokeWidth={2} />
           </span>
-          <div className="min-w-0">
-            <span className="inline-flex rounded-full bg-teal/10 px-2.5 py-0.5 text-[11px] font-bold text-teal">
-              {deriveVisitType(record)}
-            </span>
+                      <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex rounded-full bg-teal/10 px-2.5 py-0.5 text-[11px] font-bold text-teal">
+                {deriveVisitType(record)}
+              </span>
+              {hasMedications && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                  <Pill className="h-3 w-3" strokeWidth={2.4} />
+                  Medication
+                </span>
+              )}
+            </div>
             <h3 className="mt-1.5 truncate text-base font-extrabold text-ink">{record.diagnosis || 'Medical visit'}</h3>
           </div>
         </div>
@@ -368,11 +681,11 @@ const MedicalRecordCard = ({ record }) => {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5 sm:px-6">
         <div className="flex items-center gap-2 text-sm">
           <UserRound className="h-4 w-4 text-slate-400" />
-          <span className="font-semibold text-ink">MedFlow Veterinary Team</span>
+                    <span className="font-semibold text-ink">{recordVeterinarian(record)}</span>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Activity className="h-4 w-4 text-slate-400" />
-          <span className="text-muted">MedFlow Vet Clinic</span>
+          <span className="text-muted">{recordClinic(record)}</span>
         </div>
         {record.followUpDate && (
           <div className="flex items-center gap-2 text-sm">
@@ -392,12 +705,31 @@ const MedicalRecordCard = ({ record }) => {
           emptyText="Not recorded"
           children={record.treatment}
         />
-        <SectionGrid
+              <SectionGrid
           icon={ShieldCheck}
           title="Follow-up"
           emptyText="Not scheduled"
           children={record.followUpDate ? formatDate(record.followUpDate) : 'Not scheduled'}
         />
+        {hasMedications && (
+          <div className="lg:col-span-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Medications</p>
+            <ul className="mt-1 space-y-1 text-sm text-slate-700">
+              {medications.map((med, i) => (
+                <li key={`med-${i}`} className="flex items-start gap-2">
+                  <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                  <span>{med.name || med.medicationName} — {med.dosage} {med.frequency} {med.duration}</span>
+                </li>
+              ))}
+              {prescriptions.map((rx, i) => (
+                <li key={`rx-${i}`} className="flex items-start gap-2">
+                  <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                  <span>{rx.medicationName} — {rx.dosage} {rx.frequency} {rx.duration}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Expanded details */}
@@ -539,7 +871,7 @@ const VaccinationCard = ({ record }) => {
       {/* Info grid */}
       <div className="grid gap-3 px-5 pb-1 sm:px-6 lg:grid-cols-2">
         <SectionGrid icon={ShieldCheck} title="Category" emptyText="Not set" children={record.category || 'Core'} />
-        <SectionGrid icon={UserRound} title="Veterinarian" emptyText="Not recorded" children={record.veterinarian ? 'Veterinary team' : 'Not assigned'} />
+        <SectionGrid icon={UserRound} title="Veterinarian" emptyText="Not assigned" children={recordVeterinarian(record)} />
         <SectionGrid icon={ClipboardList} title="Clinic" emptyText="Not recorded" children={record.clinic || 'Not recorded'} />
         <SectionGrid icon={Pill} title="Dose / Route" emptyText="Not recorded" children={
           [record.dose, record.route].filter(Boolean).join(' · ') || 'Not recorded'
@@ -575,7 +907,7 @@ const VaccinationCard = ({ record }) => {
   )
 }
 
-const AiReportCard = ({ record }) => {
+const AiReportCard = ({ record, onViewAiReport }) => {
   const [expanded, setExpanded] = useState(false)
   const hasSymptoms = asArray(record.symptoms).length > 0
   const hasConditions = asArray(record.possibleConditions).length > 0
@@ -732,16 +1064,28 @@ const AiReportCard = ({ record }) => {
         </div>
       )}
 
-      {/* Footer actions */}
+            {/* Footer actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 px-5 py-3.5 sm:px-6">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="inline-flex items-center gap-1.5 text-sm font-bold text-teal transition-colors hover:text-teal/80"
-        >
-          {expanded ? 'Show less' : 'View details'}
-          <ArrowRight className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-teal transition-colors hover:text-teal/80"
+          >
+            {expanded ? 'Show less' : 'View details'}
+            <ArrowRight className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />
+          </button>
+          {onViewAiReport && (
+            <button
+              type="button"
+              onClick={() => onViewAiReport(record)}
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-violet-700 transition-colors hover:text-violet/80"
+            >
+              Open AI report
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
         <p className="text-xs text-muted">
           Report ID: {record._id || '—'} · Generated {reportDate}
         </p>
@@ -760,7 +1104,7 @@ const YearMarker = ({ label, isLast }) => (
   </div>
 )
 
-const TimelineItem = ({ record }) => {
+const TimelineItem = ({ record, onViewAiReport }) => {
   const year = yearFor(record._date)
   const dateLabel = shortDate(record._date)
   const day = record._date
@@ -768,7 +1112,9 @@ const TimelineItem = ({ record }) => {
 
   const renderCard = () => {
     if (record.kind === KIND.VACCINATION) return <VaccinationCard record={record} />
-    if (record.kind === KIND.AI_REPORT) return <AiReportCard record={record} />
+    if (record.kind === KIND.AI_REPORT) return <AiReportCard record={record} onViewAiReport={onViewAiReport} />
+    if (record.kind === KIND.PRESCRIPTION) return <PrescriptionCard record={record} />
+    if (record.kind === KIND.CONSULTATION) return <ConsultationCard record={record} />
     return <MedicalRecordCard record={record} />
   }
 
@@ -790,7 +1136,7 @@ const TimelineItem = ({ record }) => {
   )
 }
 
-const MedicalTimeline = ({ records }) => {
+const MedicalTimeline = ({ records, onViewAiReport }) => {
   const recordsWithMeta = useMemo(() => {
     return records.map((record, index) => ({ ...record, _isLast: index === records.length - 1 }))
   }, [records])
@@ -813,7 +1159,7 @@ const MedicalTimeline = ({ records }) => {
           <YearMarker label={year} isLast={yearIndex === years.length - 1} />
           <div className="mt-4 space-y-0">
             {groupedByYear[year].map((record) => (
-              <TimelineItem key={record._id || record.id} record={record} />
+              <TimelineItem key={record._id || record.id} record={record} onViewAiReport={onViewAiReport} />
             ))}
           </div>
         </section>
@@ -884,7 +1230,19 @@ const MedicalHistoryHero = ({ onMyPets, onRegisterPet }) => (
   </section>
 )
 
-const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], onMyPets, onBrowseVets, onRegisterPet }) => {
+const MedicalHistoryPage = ({
+  pets,
+  records,
+  vaccinations = [],
+  reports = [],
+  onMyPets,
+  onBrowseVets,
+  onRegisterPet,
+  onViewAiReport,
+  token,
+  backendUrl,
+  selectedPetId
+}) => {
   const [filters, setFilters] = useState({
     search: '',
     petId: '',
@@ -893,8 +1251,58 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
     toDate: ''
   })
 
-  // Combine all record sources into unified timeline items
+  // Unified clinical timeline fetched from the backend (all record types).
+  const [timeline, setTimeline] = useState(null)
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineError, setTimelineError] = useState('')
+
+  // Fetch the unified medical-history timeline whenever the target pet changes.
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!token || !backendUrl || !selectedPetId) {
+        setTimeline(null)
+        return
+      }
+      setTimelineLoading(true)
+      setTimelineError('')
+      try {
+        const { data } = await axios.get(
+          `${backendUrl}/api/v1/veterinary/pets/${selectedPetId}/medical-history`,
+          {
+            params: { page: 1, limit: 100 },
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        )
+        const items = data?.data?.timeline ?? data?.timeline ?? []
+        if (!cancelled) setTimeline(asArray(items))
+      } catch (requestError) {
+        if (!cancelled) {
+          setTimeline(null)
+          setTimelineError(
+            requestError?.response?.data?.message || 'Unable to load the clinical timeline.'
+          )
+        }
+      } finally {
+        if (!cancelled) setTimelineLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [token, backendUrl, selectedPetId])
+
+  // Combine all record sources into unified timeline items.
+  // Prefer the backend unified timeline (single source of truth for all
+  // clinical record types); fall back to prop-supplied collections.
   const allTimelineItems = useMemo(() => {
+    if (timeline && timeline.length > 0) {
+      return timeline
+        .map(normalizeTimelineApiItem)
+        .sort((a, b) => b._date.getTime() - a._date.getTime())
+    }
+
     const items = []
     // Medical records
     asArray(records).forEach((record) => {
@@ -927,17 +1335,22 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
       })
     })
     return items.sort((a, b) => b._date.getTime() - a._date.getTime())
-  }, [records, vaccinations, reports])
+  }, [timeline, records, vaccinations, reports])
 
   const recordedPets = useMemo(() => {
     const ids = new Set()
     asArray(records).forEach((r) => ids.add(String(r.petId || '')))
     asArray(vaccinations).forEach((v) => ids.add(String(v.petId || '')))
     asArray(reports).forEach((r) => ids.add(String(r.petId || '')))
+    asArray(timeline).forEach((t) => ids.add(String(t.petId || '')))
     return asArray(pets).filter((pet) => ids.has(String(pet._id || pet.id)))
-  }, [pets, records, vaccinations, reports])
+  }, [pets, records, vaccinations, reports, timeline])
 
-  const primaryPet = recordedPets[0] || asArray(pets)[0] || null
+  // The selected pet drives the whole clinical timeline.
+  const selectedPet =
+    asArray(pets).find((pet) => String(pet._id || pet.id) === String(selectedPetId || '')) || null
+
+  const primaryPet = selectedPet || recordedPets[0] || asArray(pets)[0] || null
 
   // Build visit type options from all record types
   const visitTypeOptions = useMemo(() => {
@@ -946,8 +1359,11 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
     asArray(records).forEach((r) => types.add(deriveVisitType(r)))
     asArray(vaccinations).forEach((v) => types.add(vaccinationCategory(v)))
     asArray(reports).forEach((r) => types.add(aiReportModality(r)))
+    if (asArray(timeline).length > 0) {
+      Object.values(RECORD_TYPE_LABELS).forEach((label) => types.add(label))
+    }
     return [...types].sort()
-  }, [records, vaccinations, reports])
+  }, [records, vaccinations, reports, timeline])
 
   const petOptions = asArray(pets).map((pet) => ({ id: pet._id || pet.id, name: pet.name }))
 
@@ -957,15 +1373,31 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
       // Pet filter
       if (filters.petId && String(item.petId || '') !== String(filters.petId)) return false
 
-      // Visit type / category filter
+            // Visit type / record type filter
       if (filters.visitType && filters.visitType !== 'All visit types') {
         let itemType = ''
         if (item.kind === KIND.MEDICAL_RECORD) {
           itemType = deriveVisitType(item)
+          // A "Visit" badge selection matches any medical record event.
+          if (filters.visitType === RECORD_TYPE_LABELS['medical-record']) itemType = 'Visit'
+          // "Medication" filter matches medical records that have medications or prescriptions.
+          if (filters.visitType === 'Medication') {
+            const hasMeds = asArray(item.medications).length > 0 || asArray(item.prescriptions).length > 0
+            if (!hasMeds) return false
+            itemType = 'Medication'
+          }
         } else if (item.kind === KIND.VACCINATION) {
           itemType = vaccinationCategory(item)
+          if (filters.visitType === 'Vaccination') itemType = 'Vaccination'
         } else if (item.kind === KIND.AI_REPORT) {
           itemType = aiReportModality(item)
+          if (filters.visitType === RECORD_TYPE_LABELS['ai-report']) itemType = 'AI Assessment'
+        } else if (item.kind === KIND.PRESCRIPTION) {
+          itemType = RECORD_TYPE_LABELS['prescription']
+          // Prescriptions also count under "Medication".
+          if (filters.visitType === 'Medication') itemType = 'Medication'
+        } else if (item.kind === KIND.CONSULTATION) {
+          itemType = RECORD_TYPE_LABELS['consultation']
         }
         if (itemType !== filters.visitType) return false
       }
@@ -982,12 +1414,12 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
             item.diagnosis,
             item.treatment,
             listText(item.symptoms),
-            listText(item.medications.map((m) => m.name)),
-            listText(item.prescriptions.map((p) => p.medicationName))
+            listText((item.medications || []).map((m) => m.name)),
+            listText((item.prescriptions || []).map((p) => p.medicationName))
           ].join(' ').toLowerCase()
         } else if (item.kind === KIND.VACCINATION) {
           haystack = [
-            item.vaccineName,
+            item.vaccineName || item.title,
             item.category,
             item.notes,
             item.clinic
@@ -1000,6 +1432,17 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
             listText(item.recommendations),
             item.modality || ''
           ].join(' ').toLowerCase()
+        } else if (item.kind === KIND.PRESCRIPTION) {
+          haystack = [
+            item.medicineName || item.title,
+            item.dosage,
+            item.frequency,
+            item.duration,
+            item.route,
+            item.additionalInstructions
+          ].join(' ').toLowerCase()
+        } else if (item.kind === KIND.CONSULTATION) {
+          haystack = [item.title, item.reason, item.notes, recordVeterinarian(item)].join(' ').toLowerCase()
         }
         if (!haystack.includes(searchTerm)) return false
       }
@@ -1018,8 +1461,14 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
     <div className="mx-auto w-full min-w-0 max-w-[1400px] space-y-8">
       <MedicalHistoryHero onMyPets={onMyPets} onRegisterPet={onRegisterPet} />
 
-      {(pets.length > 0 || allTimelineItems.length > 0) && (
-        <PetHealthSummary pet={primaryPet} records={visibleTimelineItems} />
+      {primaryPet && (
+        <ClinicalHeader pet={primaryPet} records={allTimelineItems} />
+      )}
+
+      {timelineError && (
+        <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-800">
+          {timelineError}
+        </div>
       )}
 
       <MedicalHistoryToolbar
@@ -1034,7 +1483,13 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
         petOptions={petOptions}
       />
 
-      {noRecordsAtAll ? (
+      {timelineLoading && !noRecordsAtAll ? (
+        <section className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-40 animate-pulse rounded-[20px] bg-white shadow-soft" />
+          ))}
+        </section>
+      ) : noRecordsAtAll ? (
         <MedicalHistoryEmptyState onBrowseVets={onBrowseVets} onRegisterPet={onRegisterPet} />
       ) : noVisibleResults ? (
         <section className="rounded-[20px] border border-line/70 bg-white p-10 text-center shadow-soft">
@@ -1053,7 +1508,7 @@ const MedicalHistoryPage = ({ pets, records, vaccinations = [], reports = [], on
           </button>
         </section>
       ) : (
-        <MedicalTimeline records={visibleTimelineItems} />
+        <MedicalTimeline records={visibleTimelineItems} onViewAiReport={onViewAiReport} />
       )}
     </div>
   )

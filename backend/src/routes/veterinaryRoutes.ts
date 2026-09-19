@@ -22,6 +22,7 @@ import {
   overdueVaccinations,
   petById,
   petMedicalHistory,
+  petMedicalHistoryTimeline,
   petOwnerProfile,
   pets,
   petVaccinations,
@@ -270,6 +271,15 @@ veterinaryRouter.get(
   authAny,
   validateRequest({ params: petIdParamSchema }),
   vaccinationStats
+);
+
+// Unified longitudinal clinical timeline for a pet (visits, vaccinations,
+// AI preliminary assessments, veterinarian prescriptions, consultations).
+veterinaryRouter.get(
+  "/pets/:petId/medical-history",
+  authAny,
+  validateRequest({ params: petIdParamSchema, query: vaccinationQuerySchema }),
+  petMedicalHistoryTimeline
 );
 
 veterinaryRouter.post(

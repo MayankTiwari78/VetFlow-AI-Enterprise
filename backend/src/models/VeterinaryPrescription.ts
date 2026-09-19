@@ -15,6 +15,11 @@ export interface VeterinaryPrescription {
   petId: mongoose.Types.ObjectId;
   /** The AI report that this prescription is based on (never a source of truth). */
   aiReportId: mongoose.Types.ObjectId;
+  /**
+   * Optional clinical visit record this prescription belongs to.
+   * Lets a finalized prescription appear alongside its visit in Medical History.
+   */
+  medicalRecordId?: mongoose.Types.ObjectId;
   /** Veterinarian profile that issued the prescription. */
   veterinarianId: mongoose.Types.ObjectId;
   /** Authenticated account that issued it (audit trail). */
@@ -48,6 +53,11 @@ const veterinaryPrescriptionSchema = new mongoose.Schema<VeterinaryPrescription>
       type: mongoose.Schema.Types.ObjectId,
       ref: "ai_report",
       required: true,
+      index: true
+    },
+    medicalRecordId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "pet_medical_record",
       index: true
     },
     veterinarianId: {

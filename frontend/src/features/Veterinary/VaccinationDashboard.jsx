@@ -246,9 +246,9 @@ const VaccinationForm = ({ pet, initialData, onClose, onSave, loading }) => {
   const statuses = ["up-to-date", "due-soon", "overdue", "completed", "cancelled"];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-soft-lg">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">
+      <div className="w-full max-w-3xl max-h-[90vh] rounded-2xl bg-white shadow-soft-lg flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-line/70 px-6 py-4">
           <h2 className="text-xl font-bold text-ink">
             {initialData ? "Edit Vaccination" : "Add Vaccination"}
           </h2>
@@ -261,7 +261,7 @@ const VaccinationForm = ({ pet, initialData, onClose, onSave, loading }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -445,23 +445,25 @@ const VaccinationForm = ({ pet, initialData, onClose, onSave, loading }) => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-line/70 pt-5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-line/80 bg-white px-5 py-2.5 text-sm font-bold text-ink transition-all hover:border-teal/40 hover:bg-mist hover:text-teal"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-5 py-2.5 text-sm font-bold text-white shadow-soft transition-all hover:bg-teal/90 disabled:opacity-60"
-            >
-              {loading ? "Saving..." : initialData ? "Update" : "Save"}
-            </button>
-          </div>
         </form>
+
+        <div className="flex justify-end gap-3 border-t border-line/70 px-6 py-4 bg-[#F6F9F9]/50 rounded-b-2xl">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-line/80 bg-white px-5 py-2.5 text-sm font-bold text-ink transition-all hover:border-teal/40 hover:bg-mist hover:text-teal"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handleSubmit}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-5 py-2.5 text-sm font-bold text-white shadow-soft transition-all hover:bg-teal/90 disabled:opacity-60"
+          >
+            {loading ? "Saving..." : initialData ? "Update" : "Save"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -622,7 +624,7 @@ const VaccinationDashboard = () => {
       );
       const items = unwrap(data, "vaccinations", []);
       setVaccinations(items);
-      setPagination(data.pagination || { page, limit: 20, total: items.length, pages: 1 });
+      setPagination(unwrap(data, "pagination", { page, limit: 20, total: items.length, pages: 1 }));
     } catch (requestError) {
       if (!isAuthSessionHandledError(requestError)) {
         setError(requestError.response?.data?.message || "Failed to load vaccinations.");
@@ -639,7 +641,7 @@ const VaccinationDashboard = () => {
         `${backendUrl}/api/v1/veterinary/pets/${selectedPetId}/vaccinations/stats`,
         authConfig(token)
       );
-      setStats(data.stats || data);
+      setStats(unwrap(data, "stats", null));
     } catch (requestError) {
       if (!isAuthSessionHandledError(requestError)) {
         // Non-fatal — stats are supplementary
@@ -719,11 +721,28 @@ const VaccinationDashboard = () => {
   const handleSave = async (form) => {
     setSaving(true);
     try {
+      // Backend contract (vaccinationCreateSchema): `veterinarian` is an optional
+      // ObjectId, text fields default to "" only when omitted — empty strings for
+      // ObjectId/optional fields must be dropped, not sent as "".
+      const optionalText = (value) => {
+        const trimmed = typeof value === "string" ? value.trim() : "";
+        return trimmed ? trimmed : undefined;
+      };
       const payload = {
-        ...form,
-        dueDate: form.dueDate ? new Date(form.dueDate) : undefined,
-        completedDate: form.completedDate ? new Date(form.completedDate) : undefined,
-        nextDose: form.nextDose ? new Date(form.nextDose) : undefined
+        vaccineName: optionalText(form.vaccineName),
+        category: optionalText(form.category) || "Core",
+        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
+        completedDate: form.completedDate ? new Date(form.completedDate).toISOString() : undefined,
+        nextDose: form.nextDose ? new Date(form.nextDose).toISOString() : undefined,
+        dose: optionalText(form.dose),
+        route: optionalText(form.route),
+        veterinarian: optionalText(form.veterinarian),
+        clinic: optionalText(form.clinic),
+        manufacturer: optionalText(form.manufacturer),
+        batchNumber: optionalText(form.batchNumber),
+        certificate: optionalText(form.certificate),
+        notes: optionalText(form.notes),
+        status: form.status || "up-to-date"
       };
 
       if (editingVaccination) {
@@ -748,7 +767,10 @@ const VaccinationDashboard = () => {
       void loadOverdue();
     } catch (requestError) {
       if (!isAuthSessionHandledError(requestError)) {
-        setError(requestError.response?.data?.message || "Failed to save vaccination.");
+        const details = requestError.response?.data?.errors;
+        const baseMessage = requestError.response?.data?.message || "Failed to save vaccination.";
+        const detailText = Array.isArray(details) && details.length ? ` — ${details.join("; ")}` : "";
+        setError(`${baseMessage}${detailText}`);
       }
     } finally {
       setSaving(false);
@@ -817,11 +839,12 @@ const VaccinationDashboard = () => {
           </button>
           <button
             type="button"
+            disabled={!selectedPetId}
             onClick={() => {
               setEditingVaccination(null);
               setModalMode("form");
             }}
-            className="inline-flex items-center gap-2 rounded-xl bg-teal px-4 py-2.5 text-sm font-bold text-white shadow-soft transition-all duration-200 hover:bg-teal/90"
+            className="inline-flex items-center gap-2 rounded-xl bg-teal px-4 py-2.5 text-sm font-bold text-white shadow-soft transition-all duration-200 hover:bg-teal/90 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" />
             Add Vaccination
@@ -866,36 +889,51 @@ const VaccinationDashboard = () => {
       </section>
 
       {/* Summary Cards */}
-      {stats && (
+      {stats ? (
         <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             icon={Syringe}
             label="Total Vaccinations"
-            value={stats.total}
-            detail={`${stats.completed} completed`}
+            value={stats.total ?? 0}
+            detail={`${(stats.completed ?? 0)} completed`}
             tone="bg-teal/10 text-teal"
           />
           <SummaryCard
             icon={PawPrint}
             label="Up to Date"
-            value={stats.upToDate}
-            detail={stats.total > 0 ? `${Math.round((stats.upToDate / stats.total) * 100)}% of total` : "All up to date"}
+            value={stats.upToDate ?? 0}
+            detail={
+              (stats.total ?? 0) > 0
+                ? `${Math.round(((stats.upToDate ?? 0) / (stats.total ?? 0)) * 100)}% of total`
+                : "All up to date"
+            }
             tone="bg-emerald-50 text-emerald-600"
           />
           <SummaryCard
             icon={Calendar}
             label="Due Soon"
-            value={stats.dueSoon}
-            detail={stats.dueSoon > 0 ? "Within 7 days" : "None due soon"}
+            value={stats.dueSoon ?? 0}
+            detail={(stats.dueSoon ?? 0) > 0 ? "Within 7 days" : "None due soon"}
             tone="bg-amber-50 text-amber-600"
           />
           <SummaryCard
             icon={Calendar}
             label="Overdue"
-            value={stats.overdue}
-            detail={stats.overdue > 0 ? "Action needed" : "All current"}
+            value={stats.overdue ?? 0}
+            detail={(stats.overdue ?? 0) > 0 ? "Action needed" : "All current"}
             tone="bg-rose-50 text-rose-600"
           />
+        </div>
+      ) : (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Total Vaccinations", value: 0, detail: "No records", tone: "bg-teal/10 text-teal", icon: Syringe },
+            { label: "Up to Date", value: 0, detail: "No records", tone: "bg-emerald-50 text-emerald-600", icon: PawPrint },
+            { label: "Due Soon", value: 0, detail: "None due soon", tone: "bg-amber-50 text-amber-600", icon: Calendar },
+            { label: "Overdue", value: 0, detail: "All current", tone: "bg-rose-50 text-rose-600", icon: Calendar },
+          ].map((card) => (
+            <SummaryCard key={card.label} icon={card.icon} label={card.label} value={card.value} detail={card.detail} tone={card.tone} />
+          ))}
         </div>
       )}
 

@@ -255,7 +255,9 @@ export const prescriptionCreateSchema = z.object({
   frequency: boundedText(120),
   duration: boundedText(120),
   route: z.string().trim().max(160).default(""),
-  additionalInstructions: z.string().trim().max(4000).default("")
+  additionalInstructions: z.string().trim().max(4000).default(""),
+  /** Optional clinical visit record this prescription belongs to. */
+  medicalRecordId: objectIdSchema.optional()
 });
 
 export const prescriptionQuerySchema = veterinaryListQuerySchema.extend({

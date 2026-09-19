@@ -10,9 +10,11 @@ import AIReportModel, {
   AI_REVIEW_DECISIONS
 } from "../models/AIReport.js";
 import ConsultationRequestModel from "../models/ConsultationRequest.js";
+import mongoose, { type Types } from "mongoose";
 import DoctorModel from "../models/Doctor.js";
 import PetModel from "../models/Pet.js";
 import PetMedicalRecordModel from "../models/PetMedicalRecord.js";
+import type { PetMedicalRecordDocument } from "../models/PetMedicalRecord.js";
 import PetOwnerModel from "../models/PetOwner.js";
 import UserModel from "../models/User.js";
 import VaccinationModel from "../models/Vaccination.js";
@@ -134,6 +136,8 @@ type PrescriptionPayload = {
   duration: string;
   route?: string;
   additionalInstructions?: string;
+  /** Optional clinical visit record this prescription belongs to. */
+  medicalRecordId?: string;
 };
 
 type ConsultationRequestPayload = {
@@ -1615,9 +1619,24 @@ export const createVeterinaryPrescription = async (
     );
   }
 
+  // Optional clinical visit linkage — the visit must belong to the same pet so
+  // a prescription can never be attached to another pet's record.
+  let medicalRecordId: string | undefined;
+  if (payload.medicalRecordId) {
+    const medicalRecord = await PetMedicalRecordModel.findOne({
+      _id: payload.medicalRecordId,
+      petId: report.petId
+    }).select("_id");
+    if (!medicalRecord) {
+      throw new AppError("Medical record not found for this pet", 404);
+    }
+    medicalRecordId = String(medicalRecord._id);
+  }
+
   const prescription = await new VeterinaryPrescriptionModel({
     petId: report.petId,
     aiReportId: reportId,
+    medicalRecordId,
     veterinarianId: documentId(veterinarian),
     issuedByAccountId: actor.accountId,
     issuedByAccountType: actor.accountType,
@@ -1911,3 +1930,389 @@ export const nearbyVeterinarians = async (
 
   return items;
 };
+
+// ======== Medical History Timeline (unified clinical record) ========
+
+/** Unified clinical timeline record kinds. */
+export const TIMELINE_KIND = {
+  MEDICAL_RECORD: "medical-record",
+  VACCINATION: "vaccination",
+  AI_REPORT: "ai-report",
+  PRESCRIPTION: "prescription",
+  CONSULTATION: "consultation"
+} as const;
+
+/** Timeline item interface for unified medical history. */
+export interface TimelineItem {
+  _id: string;
+  kind: typeof TIMELINE_KIND.MEDICAL_RECORD | typeof TIMELINE_KIND.VACCINATION | typeof TIMELINE_KIND.AI_REPORT | typeof TIMELINE_KIND.PRESCRIPTION | typeof TIMELINE_KIND.CONSULTATION;
+  petId: string;
+  title: string;
+  date: Date;
+  status?: string;
+  veterinarian?: { id: string; name?: string };
+  clinic?: string;
+  category?: string;
+  modality?: string;
+  severity?: string;
+  symptoms?: string[];
+  possibleConditions?: string[];
+  aiSummary?: string;
+  recommendations?: string[];
+  veterinarianReview?: {
+    status?: string;
+    decision?: string;
+    notes?: string;
+    finalAssessment?: { condition?: string; diagnosis?: string; evidenceBand?: string; summary?: string };
+    reviewedAt?: Date;
+  };
+  metadata?: Record<string, unknown>;
+  diagnosis?: string;
+  treatment?: string;
+  medications?: Array<{ name: string; dosage: string; frequency: string; duration: string; instructions?: string }>;
+  prescriptions?: Array<{ medicationName: string; dosage: string; frequency: string; duration: string; instructions?: string }>;
+  laboratoryReports?: Array<{ title: string; reportType?: string; result?: string; fileUrl?: string }>;
+  attachments?: Array<{ fileName: string; fileUrl: string; fileType?: string }>;
+  visitDate?: Date;
+  followUpDate?: Date;
+  medicineName?: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  route?: string;
+  additionalInstructions?: string;
+  reviewDecision?: string;
+  issuedAt?: Date;
+  aiReportId?: string;
+  medicalRecordId?: string;
+  reason?: string;
+  preferredDates?: string[];
+  decidedByAccountId?: string;
+  decidedAt?: Date;
+  notes?: string;
+}
+/** Populate the veterinarian profile (and doctor name) on medical records. */
+const MEDICAL_RECORD_POPULATE = {
+  path: "veterinarianId",
+  select: "specialization clinicName doctorId",
+  populate: { path: "doctorId", select: "name" }
+};
+
+/** Populate the issuing veterinarian on a finalized prescription. */
+const PRESCRIPTION_POPULATE = {
+  path: "veterinarianId",
+  select: "specialization clinicName doctorId",
+  populate: { path: "doctorId", select: "name" }
+};
+
+/** Populate the reviewing veterinarian profile on an AI report. */
+const AI_REVIEW_POPULATE = {
+  path: "veterinarianReview.veterinarianId",
+  select: "specialization clinicName doctorId",
+  populate: { path: "doctorId", select: "name" }
+};
+
+/** Populate the requested veterinarian profile on a consultation request. */
+const CONSULTATION_POPULATE = {
+  path: "veterinarianId",
+  select: "specialization clinicName doctorId",
+  populate: { path: "doctorId", select: "name" }
+};
+
+/** Convert a string id into a mongoose ObjectId for timeline filters. */
+const timelineObjectId = (value: string): Types.ObjectId =>
+  mongoose.Types.ObjectId.createFromHexString(value);
+
+/**
+ * Build a unified medical history timeline for a single pet.
+ *
+ * Combines veterinary visits (PetMedicalRecord), vaccinations, AI preliminary
+ * assessments, veterinarian-finalized prescriptions and consultation requests
+ * into one chronologically ordered clinical timeline. AI assessments are never
+ * merged into (or replaced by) veterinarian final decisions.
+ */
+export const getMedicalHistoryTimeline = async (
+  actor: VeterinaryActor,
+  petId: string,
+  query: ListingQuery = {}
+): Promise<PaginatedResult<TimelineItem>> => {
+  requireAnyPermission(actor, ["users:read", "reports:read", "appointments:read"]);
+  await assertPetAccess(actor, petId, "read");
+
+  const options = listOptions(query);
+  const petFilter = { petId: timelineObjectId(petId) };
+  const rawSearch = (options.search ?? "").trim();
+  const searchRegex = rawSearch ? new RegExp(escapeRegex(rawSearch), "i") : null;
+
+  const [records, vaccinations, aiReports, prescriptions, consultations] = await Promise.all([
+    PetMedicalRecordModel.find(petFilter).sort({ visitDate: -1 }).populate(MEDICAL_RECORD_POPULATE),
+    VaccinationModel.find({ ...petFilter, isDeleted: { $ne: true } })
+      .sort({ dueDate: -1 })
+      .populate(VACCINATION_POPULATE),
+    AIReportModel.find(petFilter).sort({ generatedAt: -1 }).populate(AI_REVIEW_POPULATE),
+    VeterinaryPrescriptionModel.find(petFilter).sort({ issuedAt: -1 }).populate(PRESCRIPTION_POPULATE),
+    ConsultationRequestModel.find(petFilter).sort({ requestedAt: -1 }).populate(CONSULTATION_POPULATE)
+  ]);
+
+  const items: TimelineItem[] = records.map(timelineFromMedicalRecord);
+
+  for (const vaccination of vaccinations) {
+    const item: TimelineItem = {
+      _id: String(vaccination._id),
+      kind: TIMELINE_KIND.VACCINATION,
+      petId: String(vaccination.petId),
+      title: vaccination.vaccineName || "Vaccination",
+      date: vaccination.completedDate
+        ? new Date(vaccination.completedDate)
+        : new Date(vaccination.dueDate),
+      status: computeVaccinationStatus(vaccination),
+      category: vaccination.category || "Core",
+      clinic: vaccination.clinic || undefined,
+      veterinarian: timelineVeterinarian(vaccination.veterinarian),
+      metadata: {
+        vaccineName: vaccination.vaccineName,
+        category: vaccination.category,
+        dose: vaccination.dose,
+        route: vaccination.route,
+        dueDate: vaccination.dueDate,
+        completedDate: vaccination.completedDate,
+        nextDose: vaccination.nextDose,
+        manufacturer: vaccination.manufacturer,
+        batchNumber: vaccination.batchNumber,
+        certificate: vaccination.certificate,
+        notes: vaccination.notes
+      }
+    };
+    if (timelineMatchesSearch(item, searchRegex)) items.push(item);
+  }
+
+  for (const report of aiReports) {
+    const review = report.veterinarianReview as TimelineReviewShape | undefined;
+    const item: TimelineItem = {
+      _id: String(report._id),
+      kind: TIMELINE_KIND.AI_REPORT,
+      petId: String(report.petId),
+      title: timelineAiTitle(report.aiSummary),
+      date: report.generatedAt
+        ? new Date(report.generatedAt)
+        : new Date(report.createdAt ?? Date.now()),
+      // AI assessment identity — this is decision support, never a diagnosis.
+      modality: report.modality || "symptom",
+      severity: report.severity,
+      status: review?.status || (review?.decision ? "reviewed" : "pending"),
+      symptoms: report.symptoms ?? [],
+      possibleConditions: report.possibleConditions ?? [],
+      aiSummary: report.aiSummary || "",
+      recommendations: report.recommendations ?? [],
+      veterinarian: timelineVeterinarian(review?.veterinarianId, review?.reviewerName),
+      veterinarianReview: review
+        ? {
+            status: review.status,
+            decision: review.decision,
+            notes: review.notes,
+            finalAssessment: review.finalAssessment,
+            reviewedAt: review.reviewedAt
+          }
+        : undefined,
+      metadata: {
+        modality: report.modality || "symptom",
+        severity: report.severity,
+        modelVersion: report.modelVersion,
+        possibleConditions: report.possibleConditions ?? []
+      }
+    };
+    if (timelineMatchesSearch(item, searchRegex)) items.push(item);
+  }
+
+  for (const prescription of prescriptions) {
+    const item: TimelineItem = {
+      _id: String(prescription._id),
+      kind: TIMELINE_KIND.PRESCRIPTION,
+      petId: String(prescription.petId),
+      title: prescription.medicineName || "Prescription",
+      date: prescription.issuedAt ? new Date(prescription.issuedAt) : new Date(),
+      status: prescription.status || "active",
+      // Veterinarian attribution is preserved on the finalized prescription.
+      veterinarian: timelineVeterinarian(prescription.veterinarianId),
+      aiReportId: String(prescription.aiReportId ?? ""),
+      medicalRecordId: prescription.medicalRecordId ? String(prescription.medicalRecordId) : undefined,
+      medicineName: prescription.medicineName,
+      dosage: prescription.dosage,
+      frequency: prescription.frequency,
+      duration: prescription.duration,
+      route: prescription.route,
+      additionalInstructions: prescription.additionalInstructions,
+      reviewDecision: prescription.reviewDecision,
+      issuedAt: prescription.issuedAt,
+      metadata: {
+        medicineName: prescription.medicineName,
+        dosage: prescription.dosage,
+        frequency: prescription.frequency,
+        duration: prescription.duration,
+        route: prescription.route,
+        status: prescription.status,
+        issuedByAccountType: prescription.issuedByAccountType
+      }
+    };
+    if (timelineMatchesSearch(item, searchRegex)) items.push(item);
+  }
+
+  for (const consultation of consultations) {
+    const item: TimelineItem = {
+      _id: String(consultation._id),
+      kind: TIMELINE_KIND.CONSULTATION,
+      petId: String(consultation.petId),
+      title: "Consultation Request",
+      date: consultation.requestedAt
+        ? new Date(consultation.requestedAt)
+        : new Date(consultation.createdAt ?? Date.now()),
+      status: consultation.status,
+      veterinarian: timelineVeterinarian(consultation.veterinarianId),
+      reason: consultation.reason,
+      preferredDates: consultation.preferredDates ?? [],
+      decidedByAccountId: consultation.decidedByAccountId,
+      decidedAt: consultation.decidedAt,
+      notes: consultation.notes,
+      metadata: { reason: consultation.reason, status: consultation.status }
+    };
+    if (timelineMatchesSearch(item, searchRegex)) items.push(item);
+  }
+
+  items.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  return paginateTimelineItems(items, options);
+};
+/** Minimal shape of the immutable veterinarian review stored on an AI report. */
+type TimelineReviewShape = {
+  status?: string;
+  decision?: string;
+  notes?: string;
+  reviewerName?: string;
+  reviewedAt?: Date;
+  veterinarianId?: unknown;
+  finalAssessment?: { condition?: string; diagnosis?: string; evidenceBand?: string; summary?: string };
+};
+
+/** Resolve a populated veterinarian reference into `{ id, name }`. */
+const timelineVeterinarian = (
+  reference: unknown,
+  fallbackName?: string
+): { id: string; name?: string } | undefined => {
+  if (!reference) return fallbackName ? { id: "", name: fallbackName } : undefined;
+
+  const raw = reference as {
+    _id?: unknown;
+    id?: unknown;
+    clinicName?: string;
+    specialization?: string[];
+    doctorId?: unknown;
+  };
+
+  const id = String(raw._id ?? raw.id ?? reference);
+  const doctor = raw.doctorId as { name?: string } | string | undefined;
+  const name =
+    fallbackName ||
+    (doctor && typeof doctor === "object" ? doctor.name : undefined) ||
+    raw.clinicName ||
+    (Array.isArray(raw.specialization) ? raw.specialization[0] : undefined);
+
+  return { id, name };
+};
+
+/** Build the short title shown for an AI assessment timeline event. */
+const timelineAiTitle = (summary?: string): string => {
+  const text = String(summary ?? "").trim();
+  if (!text) return "AI Preliminary Assessment";
+  return text.length > 110 ? `${text.slice(0, 110)}…` : text;
+};
+
+/** Case-insensitive search across the displayable timeline fields. */
+const timelineMatchesSearch = (item: TimelineItem, regex: RegExp | null): boolean => {
+  if (!regex) return true;
+
+  const haystack = [
+    item.title,
+    item.diagnosis,
+    item.treatment,
+    item.aiSummary,
+    item.medicineName,
+    item.notes,
+    item.reason,
+    item.clinic,
+    item.category,
+    item.modality,
+    item.additionalInstructions,
+    ...(item.symptoms ?? []),
+    ...(item.possibleConditions ?? []),
+    ...(item.recommendations ?? []),
+    ...(item.medications ?? []).map((medication) => medication.name),
+    ...(item.prescriptions ?? []).map((prescription) => prescription.medicationName),
+    item.veterinarian?.name ?? ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  regex.lastIndex = 0;
+  return regex.test(haystack);
+};
+
+/** Paginate an in-memory timeline (all sources are merged before slicing). */
+const paginateTimelineItems = (
+  items: TimelineItem[],
+  options: { page?: number; limit?: number }
+): PaginatedResult<TimelineItem> => {
+  const total = items.length;
+  const page = Math.max(1, Number(options.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(options.limit) || 20));
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const start = (page - 1) * limit;
+
+  return {
+    items: items.slice(start, start + limit),
+    pagination: { page, limit, total, pages }
+  };
+};
+
+/** Map a PetMedicalRecord into a finalized clinical timeline event. */
+function timelineFromMedicalRecord(record: PetMedicalRecordDocument): TimelineItem {
+  return {
+  _id: String(record._id),
+  kind: TIMELINE_KIND.MEDICAL_RECORD,
+  petId: String(record.petId),
+  title: record.diagnosis || "Veterinary Visit",
+  date: record.visitDate ? new Date(record.visitDate) : new Date(record.createdAt ?? Date.now()),
+  status: "finalized",
+  veterinarian: timelineVeterinarian(record.veterinarianId),
+  diagnosis: record.diagnosis,
+  symptoms: record.symptoms ?? [],
+  treatment: record.treatment,
+  medications: record.medications ?? [],
+  prescriptions: (record.prescriptions ?? []).map((prescription) => ({
+    medicationName: prescription.medicationName,
+    dosage: prescription.dosage,
+    frequency: prescription.frequency,
+    duration: prescription.duration,
+    instructions: prescription.instructions
+  })),
+  laboratoryReports: (record.laboratoryReports ?? []).map((report) => ({
+    title: report.title,
+    reportType: report.reportType,
+    result: report.result,
+    fileUrl: report.fileUrl
+  })),
+  attachments: (record.attachments ?? []).map((attachment) => ({
+    fileName: attachment.fileName,
+    fileUrl: attachment.fileUrl,
+    fileType: attachment.fileType
+  })),
+  visitDate: record.visitDate,
+  followUpDate: record.followUpDate,
+  metadata: {
+    diagnosis: record.diagnosis,
+    symptoms: record.symptoms ?? [],
+    treatment: record.treatment,
+    medications: record.medications ?? [],
+    prescriptions: record.prescriptions ?? []
+    }
+  };
+}

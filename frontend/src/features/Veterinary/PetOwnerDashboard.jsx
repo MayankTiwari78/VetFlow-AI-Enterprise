@@ -1512,6 +1512,10 @@ const PetOwnerDashboard = ({ view = 'dashboard', initialAction = '' }) => {
           onMyPets={() => navigate('/pet-owner/pets')}
           onBrowseVets={() => navigate('/pet-owner/veterinarians')}
           onRegisterPet={() => navigate('/pet-owner/pets/register')}
+          onViewAiReport={(report) => navigate(`/pet-owner/ai-reports?reportId=${getId(report)}`)}
+          token={token}
+          backendUrl={backendUrl}
+          selectedPetId={getId(selectedPet)}
         />
       )}
       {view === 'vaccinations' && <DataTable columns={vaccinationColumns} rows={vaccinations} emptyTitle='No vaccination history found.' />}
