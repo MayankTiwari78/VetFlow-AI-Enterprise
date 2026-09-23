@@ -58,9 +58,49 @@ export const appointmentSlotDateTime = (appointment) => {
 }
 
 /** Lifecycle status stored on the document. Payment status is deliberately independent of this. */
+
+/**
+ * Canonical lifecycle buckets: "scheduled" | "completed" | "cancelled".
+ *
+ * The backend stores `status` as a lowercase enum value, but legacy documents and older writers can
+ * deliver casing/alias variants ("COMPLETED", "Completed", "Canceled", ...) or lean on the
+ * `cancelled` / `isCompleted` booleans alone. Normalizing here keeps every tab bucket stable no
+ * matter how the value was stored. The `payment` flag is NEVER part of this resolution: payment
+ * status and appointment status stay independent.
+ */
+const STATUS_ALIASES = {
+  scheduled: 'scheduled',
+  confirmed: 'scheduled',
+  booked: 'scheduled',
+  pending: 'scheduled',
+  active: 'scheduled',
+  upcoming: 'scheduled',
+  completed: 'completed',
+  complete: 'completed',
+  finished: 'completed',
+  done: 'completed',
+  cancelled: 'cancelled',
+  canceled: 'cancelled'
+}
+
+export const normalizeAppointmentStatus = (value) => {
+  const key = String(value ?? '').trim().toLowerCase()
+  return STATUS_ALIASES[key] || ''
+}
+
 export const getAppointmentStatus = (appointment) => {
-  if (appointment?.status) return appointment.status
+  // The `cancelled` flag is the strongest terminal signal: every backend writer sets it together
+  // with `status`, so honoring it first safely outranks any stale stored status value.
   if (appointment?.cancelled) return 'cancelled'
+
+  const status = normalizeAppointmentStatus(appointment?.status)
+  if (status) {
+    // Legacy documents can carry `isCompleted: true` while `status` was never advanced past
+    // "scheduled"; the completion boolean then reflects the real lifecycle state.
+    if (status === 'scheduled' && appointment?.isCompleted) return 'completed'
+    return status
+  }
+
   if (appointment?.isCompleted) return 'completed'
   return 'scheduled'
 }
@@ -116,6 +156,9 @@ export const formatSlotDate = (slotDate) => {
 
 export const normalizeAppointment = (appointment, index = 0) => ({
   ...appointment,
+  // Canonical lifecycle status so the tab filters and status badges agree even when the stored
+  // value arrives with legacy casing or only the `cancelled` / `isCompleted` booleans are set.
+  status: getAppointmentStatus(appointment),
   docData: normalizeDoctor(appointment?.docData, index)
 })
 
